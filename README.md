@@ -1,6 +1,34 @@
 # Antara
 
+## Prerequisites
+- Node.js version 16.x
+- npm or yarn package manager
 
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://gitlab.com/reka-dev/underground/antara.git
+cd antara
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+## Running the Application
+
+To start the development server:
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+The application will be available at `http://localhost:3000` (or the configured port).
 
 ## Getting started
 
