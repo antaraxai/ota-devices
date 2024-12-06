@@ -1,40 +1,47 @@
-import React from 'react';
-import InputCard from './components/InputCard';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
+
+// Protected Route wrapper component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  return <>{children}</>;
+}
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-2xl font-bold mb-8"># Inputs</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <InputCard
-          title="Living Room"
-          type="Thermostat"
-          value={23.8}
-          unit="°C"
-          time="11:15 AM"
-          status="Normal"
-          autoUpdate={true}
-        />
-        <InputCard
-          title="Server"
-          type="Light"
-          value={70.7}
-          unit="%"
-          time="11:15 AM"
-          status="Normal"
-          autoUpdate={false}
-        />
-        <InputCard
-          title="Front Door"
-          type="Lock"
-          value={24}
-          unit="°C"
-          time="11:09 AM"
-          status="High"
-          autoUpdate={true}
-        />
-      </div>
-    </div>
+    <AuthProvider>
+      <Router>
+        <ToastContainer position="top-right" />
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 
