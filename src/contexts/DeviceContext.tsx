@@ -11,6 +11,7 @@ interface DeviceContextType {
   updateDevice: (id: string, updates: Partial<CreateDeviceInput>) => Promise<Device>;
   deleteDevice: (id: string) => Promise<void>;
   refreshDevices: () => Promise<void>;
+  toggleAutoUpdate: (id: string, value: boolean) => Promise<void>;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -118,6 +119,30 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const toggleAutoUpdate = async (id: string, value: boolean) => {
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .update({ auto_update: value })
+        .eq('id', id)
+        .eq('user_id', user?.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error('Failed to update device');
+
+      setDevices(prev => prev.map(device => 
+        device.id === id ? data : device
+      ));
+      
+      toast.success(`Auto-update ${value ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      toast.error('Failed to update auto-update setting');
+      throw error;
+    }
+  };
+
   const value = {
     devices,
     loading,
@@ -125,6 +150,7 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     updateDevice,
     deleteDevice,
     refreshDevices,
+    toggleAutoUpdate
   };
 
   return (

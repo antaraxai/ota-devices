@@ -7,7 +7,7 @@ export interface Device {
   title: string;
   type: DeviceType;
   value: number;
-  unit: string;
+  unit: '°C' | '%';
   status: DeviceStatus;
   auto_update: boolean;
   user_id: string;
@@ -17,6 +17,7 @@ export interface Device {
   repo_path?: string;
   github_token?: string;
   github_username?: string;
+  script_content?: string;
   created_at: string;
   updated_at: string;
 }
@@ -25,7 +26,7 @@ export interface CreateDeviceInput {
   title: string;
   type: DeviceType;
   value: number;
-  unit: string;
+  unit: '°C' | '%';
   auto_update: boolean;
   // GitHub integration fields
   repo_url?: string;

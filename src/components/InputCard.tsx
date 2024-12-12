@@ -1,14 +1,15 @@
 import React from 'react';
 import { FaThermometerHalf, FaLightbulb, FaLock, FaComment, FaEdit } from 'react-icons/fa';
 import CretaExpression from './CretaExpression';
+import { DeviceStatus } from '../types/device';
 
 interface InputCardProps {
   title: string;
-  type: 'Thermostat' | 'Light' | 'Lock';
+  type: 'Thermostat' | 'Light' | 'Lock' | 'Camera';
   value: number;
   unit: '°C' | '%';
   time: string;
-  status: 'Normal' | 'High';
+  status: DeviceStatus;
   autoUpdate: boolean;
 }
 
@@ -40,7 +41,9 @@ const InputCard: React.FC<InputCardProps> = ({
           <CretaExpression 
             className="transform scale-50"
             status={autoUpdate ? 'online' : 'offline'}
-            health={status === 'Normal' ? 'good' : 'critical'}
+            health={status === 'Normal' ? 'good' : 
+                   status === 'Warning' ? 'warning' :
+                   status === 'High' ? 'critical' : 'warning'}
           />
         </div>
 

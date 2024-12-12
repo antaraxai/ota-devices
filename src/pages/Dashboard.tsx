@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDevices } from '../contexts/DeviceContext';
 import { FaUser, FaCog, FaBell, FaSignOutAlt, FaPlus, FaChartBar, FaTrash, FaEdit } from 'react-icons/fa';
-import InputCard from '../components/InputCard';
+import { DeviceCard } from '../components/DeviceCard';
 import DeviceModal from '../components/DeviceModal';
 import { CreateDeviceInput } from '../types/device';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
-  const { devices, loading, createDevice, updateDevice, deleteDevice } = useDevices();
+  const { devices, loading, createDevice, updateDevice, deleteDevice, toggleAutoUpdate } = useDevices();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
@@ -146,32 +146,16 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {devices.map((device) => (
                       <div key={device.id} className="relative group">
-                        <InputCard
-                          title={device.title}
-                          type={device.type}
-                          value={device.value}
-                          unit={device.unit}
-                          time={new Date(device.updated_at).toLocaleTimeString()}
-                          status={device.status}
-                          autoUpdate={device.auto_update}
+                        <DeviceCard
+                          device={device}
+                          onUpdate={updateDevice}
+                          onToggleAutoUpdate={toggleAutoUpdate}
+                          onEdit={() => {
+                            setSelectedDevice(device);
+                            setIsDeviceModalOpen(true);
+                          }}
+                          onDelete={() => handleDeleteDevice(device.id)}
                         />
-                        <div className="absolute top-2 right-2 hidden group-hover:flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedDevice(device);
-                              setIsDeviceModalOpen(true);
-                            }}
-                            className="p-1 text-gray-500 hover:text-indigo-600 bg-white rounded-full shadow-sm"
-                          >
-                            <FaEdit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDevice(device.id)}
-                            className="p-1 text-gray-500 hover:text-red-600 bg-white rounded-full shadow-sm"
-                          >
-                            <FaTrash className="h-4 w-4" />
-                          </button>
-                        </div>
                       </div>
                     ))}
                   </div>
