@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Device, CreateDeviceInput } from '../types/device';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-toastify';
+import { GitHubService } from '../services/github';
 
 interface DeviceContextType {
   devices: Device[];
@@ -12,6 +13,7 @@ interface DeviceContextType {
   deleteDevice: (id: string) => Promise<void>;
   refreshDevices: () => Promise<void>;
   toggleAutoUpdate: (id: string, value: boolean) => Promise<void>;
+  downloadGitHubFile: (deviceId: string) => Promise<string>;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
@@ -55,7 +57,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
       const newDevice = {
         ...input,
         user_id: user.id,
-        status: 'Normal' as const,
+        status: 'offline' as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const { data, error } = await supabase
@@ -143,6 +147,38 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const downloadGitHubFile = async (deviceId: string): Promise<string> => {
+    try {
+      const device = devices.find(d => d.id === deviceId);
+      if (!device) {
+        throw new Error('Device not found');
+      }
+
+      const content = await GitHubService.downloadFile(device);
+      
+      // Update the device's script content in the database
+      const { error } = await supabase
+        .from('devices')
+        .update({ script_content: content })
+        .eq('id', deviceId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setDevices(prev => prev.map(d => 
+        d.id === deviceId ? { ...d, script_content: content } : d
+      ));
+
+      toast.success('Script downloaded successfully');
+      return content;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to download GitHub file';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   const value = {
     devices,
     loading,
@@ -150,7 +186,8 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     updateDevice,
     deleteDevice,
     refreshDevices,
-    toggleAutoUpdate
+    toggleAutoUpdate,
+    downloadGitHubFile
   };
 
   return (

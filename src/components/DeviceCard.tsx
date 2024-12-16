@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Device } from '../types';
 import { FaGithub, FaCodeBranch, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaPencilAlt, FaTrash } from 'react-icons/fa';
 import { FiZap, FiDownload } from 'react-icons/fi';
+import { useDevices } from '../contexts/DeviceContext';
+import { toast } from 'react-toastify'; // Assuming you have a toast library
 
 interface DeviceCardProps {
   device: Device;
@@ -31,6 +33,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   onEdit,
   onDelete
 }) => {
+  const { downloadGitHubFile } = useDevices();
   const [expanded, setExpanded] = useState(true);
   const [isBlinking, setIsBlinking] = useState(false);
 
@@ -49,36 +52,47 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     return () => clearInterval(blinkInterval);
   }, []);
 
-  const handleDownload = useCallback(async () => {
+  const handleFetchFromGitHub = async () => {
+    try {
+      await downloadGitHubFile(device.id);
+    } catch (error) {
+      console.error('Error downloading script:', error);
+    }
+  };
+
+  const handleDownloadScript = useCallback(async () => {
     try {
       if (!device.script_content) {
-        throw new Error('No script content available');
+        toast.error('No script content available');
+        return;
       }
 
-      // Extract filename from path or use default
-      const filename = device.repo_path?.split('/').pop() || 'device-script.js';
-      
-      // Create blob from content
+      // Get filename from repo_path or fallback to a default name
+      const filename = device.repo_path 
+        ? device.repo_path.split('/').pop() || 'script.js'
+        : `${device.title.toLowerCase().replace(/\s+/g, '-')}-script.js`;
+
+      // Create a blob from the script content
       const blob = new Blob([device.script_content], { type: 'text/javascript' });
-      const downloadUrl = window.URL.createObjectURL(blob);
-      
-      // Create download link
+      const url = URL.createObjectURL(blob);
+
+      // Create a temporary link and trigger download
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = url;
       link.download = filename;
-      
-      // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Cleanup
-      window.URL.revokeObjectURL(downloadUrl);
+
+      // Clean up the URL
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('Failed to download file. Please try again.');
+      console.error('Error downloading script:', error);
+      toast.error('Failed to download script');
     }
-  }, [device.script_content, device.repo_path]);
+  }, [device.script_content, device.repo_path, device.title]);
+
+  const hasGitHubConfig = Boolean(device.repo_url && device.repo_path && device.github_token);
 
   const toggleExpanded = useCallback(() => {
     setExpanded(prev => !prev);
@@ -205,25 +219,61 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
             </div>
           </div>
 
-          {/* Device Script Section */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="font-medium">Device Script</span>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => onUpdate(device.id)}
-                className="px-4 py-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
-                title="Run device script"
-              >
-                Run Script
-              </button>
-              <button 
-                onClick={handleDownload}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                title="Download script"
-              >
-                <FiDownload className="w-5 h-5" />
-              </button>
+          {/* GitHub integration section */}
+          {hasGitHubConfig && (
+            <div className="mt-4 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <FaGithub className="text-gray-600" />
+                  <span className="text-sm text-gray-600">GitHub Connected</span>
+                </div>
+                <button
+                  onClick={handleFetchFromGitHub}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                >
+                  <FaSync className="w-4 h-4" />
+                  <span>Fetch Latest</span>
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                <div className="flex items-center space-x-2">
+                  <FaCodeBranch className="w-3 h-3" />
+                  <span>{device.repo_branch || 'main'}</span>
+                </div>
+                <div className="flex items-center space-x-2 mt-1">
+                  <FaFolder className="w-3 h-3" />
+                  <span>{device.repo_path}</span>
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* Device Script Section */}
+          <div className="mt-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">Device Script</span>
+              {device.script_content && (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleDownloadScript}
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                    title="Download script"
+                  >
+                    <FiDownload className="w-4 h-4" />
+                    <span>Download</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            {device.script_content ? (
+              <pre className="mt-2 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
+                {device.script_content.slice(0, 100)}...
+              </pre>
+            ) : (
+              <p className="text-sm text-gray-500 mt-2">
+                {hasGitHubConfig ? 'Click "Fetch Latest" to get the script from GitHub' : 'No script available'}
+              </p>
+            )}
           </div>
         </div>
       )}
