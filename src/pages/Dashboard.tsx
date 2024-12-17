@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDevices } from '../contexts/DeviceContext';
-import { FaUser, FaCog, FaBell, FaSignOutAlt, FaPlus, FaChartBar, FaTrash, FaEdit } from 'react-icons/fa';
-import InputCard from '../components/InputCard';
+import { FaUser, FaCog, FaBell, FaSignOutAlt, FaPlus, FaChartBar, FaTrash, FaEdit, FaTable, FaTh } from 'react-icons/fa';
+import { DeviceCard } from '../components/DeviceCard';
+import DeviceTable from '../components/DeviceTable';
 import DeviceModal from '../components/DeviceModal';
 import { CreateDeviceInput } from '../types/device';
 
@@ -12,6 +13,8 @@ export default function Dashboard() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
 
   const handleSignOut = async () => {
     try {
@@ -48,6 +51,18 @@ export default function Dashboard() {
       await deleteDevice(id);
     }
   };
+
+  const handleToggleExpand = useCallback((deviceId: string) => {
+    setExpandedDevices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(deviceId)) {
+        newSet.delete(deviceId);
+      } else {
+        newSet.add(deviceId);
+      }
+      return newSet;
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,48 +148,71 @@ export default function Dashboard() {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow">
               <div className="p-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Connected Devices</h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h1 className="text-2xl font-semibold text-gray-900">Connected Devices</h1>
+                  <div className="flex space-x-4">
+                    <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+                      <button
+                        onClick={() => setViewMode('card')}
+                        className={`p-2 rounded ${viewMode === 'card' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+                        title="Card View"
+                      >
+                        <FaTh className="h-5 w-5 text-gray-600" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('table')}
+                        className={`p-2 rounded ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+                        title="Table View"
+                      >
+                        <FaTable className="h-5 w-5 text-gray-600" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedDevice(null);
+                        setIsDeviceModalOpen(true);
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <FaPlus className="-ml-1 mr-2 h-5 w-5" />
+                      Add Device
+                    </button>
+                  </div>
+                </div>
+
                 {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                   </div>
-                ) : devices.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    No devices found. Add a new device to get started.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ) : viewMode === 'card' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-4">
                     {devices.map((device) => (
-                      <div key={device.id} className="relative group">
-                        <InputCard
-                          title={device.title}
-                          type={device.type}
-                          value={device.value}
-                          unit={device.unit}
-                          time={new Date(device.updated_at).toLocaleTimeString()}
-                          status={device.status}
-                          autoUpdate={device.auto_update}
-                        />
-                        <div className="absolute top-2 right-2 hidden group-hover:flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedDevice(device);
-                              setIsDeviceModalOpen(true);
-                            }}
-                            className="p-1 text-gray-500 hover:text-indigo-600 bg-white rounded-full shadow-sm"
-                          >
-                            <FaEdit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDevice(device.id)}
-                            className="p-1 text-gray-500 hover:text-red-600 bg-white rounded-full shadow-sm"
-                          >
-                            <FaTrash className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        isExpanded={expandedDevices.has(device.id)}
+                        onToggleExpand={handleToggleExpand}
+                        onUpdate={() => updateDevice(device.id)}
+                        onToggleAutoUpdate={toggleAutoUpdate}
+                        onEdit={() => {
+                          setSelectedDevice(device);
+                          setIsDeviceModalOpen(true);
+                        }}
+                        onDelete={() => handleDeleteDevice(device.id)}
+                      />
                     ))}
                   </div>
+                ) : (
+                  <DeviceTable
+                    devices={devices}
+                    onUpdate={updateDevice}
+                    onToggleAutoUpdate={toggleAutoUpdate}
+                    onEdit={(device) => {
+                      setSelectedDevice(device);
+                      setIsDeviceModalOpen(true);
+                    }}
+                    onDelete={handleDeleteDevice}
+                  />
                 )}
               </div>
             </div>

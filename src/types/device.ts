@@ -19,6 +19,7 @@ export interface Device {
   github_username?: string;
   created_at: string;
   updated_at: string;
+  isExpanded?: boolean;
 }
 
 export interface CreateDeviceInput {
