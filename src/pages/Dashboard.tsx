@@ -190,15 +190,7 @@ export default function Dashboard() {
                       <DeviceCard
                         key={device.id}
                         device={device}
-                        isExpanded={expandedDevices.has(device.id)}
-                        onToggleExpand={handleToggleExpand}
                         onUpdate={() => updateDevice(device.id)}
-                        onToggleAutoUpdate={toggleAutoUpdate}
-                        onEdit={() => {
-                          setSelectedDevice(device);
-                          setIsDeviceModalOpen(true);
-                        }}
-                        onDelete={() => handleDeleteDevice(device.id)}
                       />
                     ))}
                   </div>
@@ -206,12 +198,6 @@ export default function Dashboard() {
                   <DeviceTable
                     devices={devices}
                     onUpdate={updateDevice}
-                    onToggleAutoUpdate={toggleAutoUpdate}
-                    onEdit={(device) => {
-                      setSelectedDevice(device);
-                      setIsDeviceModalOpen(true);
-                    }}
-                    onDelete={handleDeleteDevice}
                   />
                 )}
               </div>

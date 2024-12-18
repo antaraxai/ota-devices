@@ -6,12 +6,12 @@ from typing import Dict, Any
 from supabase import create_client, Client
 
 # Device Configuration - These values will be replaced by the frontend
-SUPABASE_URL = "https://hdodriygzudamnqqbluy.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkb2RyaXlnenVkYW1ucXFibHV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMzcxMTA2OCwiZXhwIjoyMDM5Mjg3MDY4fQ.yNnuOxXhJDSVrcG2X59lEVFdwiKgAOC1kHHL5EMrxsk"
-DEVICE_ID = "a5f08825-e605-4214-8700-4a0fcdc4f235"
-DEVICE_TYPE = "Thermostat"
-DEVICE_TITLE = "Test #10"
-API_URL = "http://localhost:5173"  # This will be set to http://localhost:5173
+SUPABASE_URL = "{{SUPABASE_URL}}"
+SUPABASE_KEY = "{{SUPABASE_KEY}}"
+DEVICE_ID = "{{DEVICE_ID}}"
+DEVICE_TYPE = "{{DEVICE_TYPE}}"
+DEVICE_TITLE = "{{DEVICE_TITLE}}"
+API_URL = "{{API_URL}}"  # This will be set to http://localhost:5173
 
 class DeviceManager:
     def __init__(self):

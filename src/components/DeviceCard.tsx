@@ -12,13 +12,11 @@ interface DeviceCardProps {
 
 export const DeviceCard: React.FC<DeviceCardProps> = ({ 
   device, 
-  onUpdate, 
-  onToggleAutoUpdate,
-  onEdit,
-  onDelete
+  onUpdate
 }) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const { updateDevice, deleteDevice } = useDevices();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -28,6 +26,21 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleEdit = async () => {
+    // You can implement edit functionality here
+    console.log('Edit device:', device.id);
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this device?')) {
+      try {
+        await deleteDevice(device.id);
+      } catch (error) {
+        console.error('Error deleting device:', error);
+      }
+    }
+  };
 
   // Format the value to handle long decimal numbers
   const formattedValue = typeof device.value === 'number' 
@@ -90,18 +103,20 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-center space-x-2">
+        <div className="flex justify-center space-x-4">
           <button
-            onClick={onEdit}
-            className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+            onClick={handleEdit}
+            className="flex items-center px-3 py-1 text-blue-600 hover:text-blue-800 transition-colors"
           >
-            <FaPencilAlt className="w-4 h-4" />
+            <FaPencilAlt className="w-4 h-4 mr-1" />
+            Edit
           </button>
           <button
-            onClick={onDelete}
-            className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+            onClick={handleDelete}
+            className="flex items-center px-3 py-1 text-red-600 hover:text-red-800 transition-colors"
           >
-            <FaTrash className="w-4 h-4" />
+            <FaTrash className="w-4 h-4 mr-1" />
+            Delete
           </button>
         </div>
 
@@ -118,8 +133,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         device={device}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
-        onToggleAutoUpdate={onToggleAutoUpdate}
       />
     </>
   );
 };
+
+export default DeviceCard;

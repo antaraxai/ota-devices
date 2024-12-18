@@ -1,23 +1,18 @@
 import React from 'react';
 import { Device } from '../types';
-import { FaGithub, FaCodeBranch, FaFolder, FaSync } from 'react-icons/fa';
-import { FiDownload } from 'react-icons/fi';
-import { useDevices } from '../contexts/DeviceContext';
+import { FaGithub, FaCodeBranch, FaFolder } from 'react-icons/fa';
 
 interface DeviceDetailsModalProps {
   device: Device;
   isOpen: boolean;
   onClose: () => void;
-  onToggleAutoUpdate: (deviceId: string, value: boolean) => void;
 }
 
 export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
   device,
   isOpen,
   onClose,
-  onToggleAutoUpdate,
 }) => {
-  const { downloadGitHubFile } = useDevices();
   const hasGitHubConfig = Boolean(device.repo_url && device.repo_path && device.github_token);
 
   if (!isOpen) return null;
@@ -62,40 +57,6 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                         <FaFolder className="w-5 h-5 mr-2" />
                         <span>Path: {device.repo_path}</span>
                       </div>
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center">
-                          <FaSync className="w-5 h-5 mr-2 text-gray-600" />
-                          <span>Auto-update {device.auto_update ? 'on' : 'off'}</span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="sr-only peer"
-                            checked={device.auto_update}
-                            onChange={() => onToggleAutoUpdate(device.id, !device.auto_update)}
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-
-                      <button
-                        onClick={() => downloadGitHubFile(device.id)}
-                        className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mt-2"
-                      >
-                        <FiDownload className="w-4 h-4 mr-2" />
-                        Download Latest
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Device Script Content */}
-                  {device.script_content && (
-                    <div className="border rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Device Script</h4>
-                      <pre className="bg-gray-50 p-3 rounded-md text-sm overflow-x-auto">
-                        {device.script_content}
-                      </pre>
                     </div>
                   )}
                 </div>

@@ -11,6 +11,8 @@ export interface Device {
   status: DeviceStatus;
   auto_update: boolean;
   user_id: string;
+  connected: boolean;
+  last_connected: string;
   // GitHub integration fields
   repo_url?: string;
   repo_branch?: string;
