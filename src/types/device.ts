@@ -19,6 +19,9 @@ export interface Device {
   repo_path?: string;
   github_token?: string;
   github_username?: string;
+  github_status?: 'up-to-date' | 'updating' | 'error';
+  github_error?: string;
+  last_github_check?: string;
   created_at: string;
   updated_at: string;
   isExpanded?: boolean;

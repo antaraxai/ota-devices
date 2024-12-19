@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDevices } from '../contexts/DeviceContext';
-import { FaUser, FaCog, FaBell, FaSignOutAlt, FaPlus, FaChartBar, FaTrash, FaEdit, FaTable, FaTh } from 'react-icons/fa';
+import { useNotifications } from '../contexts/NotificationContext';
+import { FaUser, FaCog, FaBell, FaSignOutAlt, FaPlus, FaChartBar, FaTrash, FaEdit, FaTable, FaTh, FaGithub } from 'react-icons/fa';
 import { DeviceCard } from '../components/DeviceCard';
 import DeviceTable from '../components/DeviceTable';
 import DeviceModal from '../components/DeviceModal';
@@ -10,11 +11,13 @@ import { CreateDeviceInput } from '../types/device';
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const { devices, loading, createDevice, updateDevice, deleteDevice } = useDevices();
+  const { unreadCount, markAllAsRead } = useNotifications();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -74,9 +77,52 @@ export default function Dashboard() {
               <span className="text-2xl font-bold text-indigo-600">Antara</span>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full">
-                <FaBell className="h-5 w-5" />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => {
+                    setIsNotificationMenuOpen(!isNotificationMenuOpen);
+                    if (unreadCount > 0) markAllAsRead();
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full relative"
+                >
+                  <FaBell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                
+                {isNotificationMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5">
+                    <div className="px-4 py-2 text-sm font-medium text-gray-700 border-b border-gray-100">
+                      Notifications
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {devices.filter(d => d.script_content).map(device => (
+                        <div key={`notification-${device.id}`} className="px-4 py-3 hover:bg-gray-50">
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0">
+                              <FaGithub className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm font-medium text-gray-900">
+                                {device.title}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Script updated from GitHub
+                              </p>
+                              <p className="mt-1 text-xs text-gray-400">
+                                {new Date(device.updated_at).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="relative">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
