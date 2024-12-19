@@ -9,9 +9,9 @@ from typing import Dict, Any, Tuple
 from supabase import create_client, Client
 
 # Only these base credentials are needed to connect to Supabase
-SUPABASE_URL = "{{SUPABASE_URL}}"
-SUPABASE_KEY = "{{SUPABASE_KEY}}"
-DEVICE_ID = "{{DEVICE_ID}}"
+SUPABASE_URL = "https://hdodriygzudamnqqbluy.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkb2RyaXlnenVkYW1ucXFibHV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMzcxMTA2OCwiZXhwIjoyMDM5Mjg3MDY4fQ.yNnuOxXhJDSVrcG2X59lEVFdwiKgAOC1kHHL5EMrxsk"
+DEVICE_ID = "867b02d4-b01c-418c-a5af-55783591982a"
 
 class DeviceManager:
     def __init__(self):
