@@ -57,12 +57,6 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     }
   };
 
-  // Format the value to handle long decimal numbers
-  const formattedValue = typeof device.value === 'number' 
-    ? device.value >= 100 
-      ? device.value.toFixed(0)
-      : device.value.toFixed(1)
-    : device.value;
 
   return (
     <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center">
@@ -82,17 +76,15 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
       {/* Title and Type */}
       <h3 className="text-2xl font-bold text-gray-900 mb-2">{device.title}</h3>
-      <p className="text-gray-500 mb-6">Type: {device.type}</p>
 
-      {/* Value */}
-      <div className="flex items-center justify-center mb-4">
-        <span className="text-4xl font-bold">{formattedValue}</span>
-        <span className="text-2xl ml-2 text-gray-500">{device.unit}</span>
-      </div>
-
+ 
       {/* Status Badge */}
       <div className="mb-4">
-        <span className="inline-flex items-center px-4 py-1 rounded-full bg-red-100 text-red-800">
+        <span className={`inline-flex items-center px-4 py-1 rounded-full ${
+          device.status.toLowerCase() === 'online' 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
           <FiZap className="mr-2" /> {device.status}
         </span>
       </div>

@@ -4,18 +4,14 @@ import { FaGithub, FaCodeBranch, FaFolder } from 'react-icons/fa';
 
 interface DeviceDetailsModalProps {
   device: Device;
-  isOpen: boolean;
   onClose: () => void;
 }
 
 export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
   device,
-  isOpen,
   onClose,
 }) => {
   const hasGitHubConfig = Boolean(device.repo_url && device.repo_path && device.github_token);
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -35,9 +31,34 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                 </h3>
                 
                 <div className="space-y-4">
+                  {/* Basic Device Information */}
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-24">ID:</span>
+                      <span>{device.id}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-24">Type:</span>
+                      <span>{device.type}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-24">Status:</span>
+                      <span>{device.status}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-24">Value:</span>
+                      <span>{device.value} {device.unit}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-24">Connection:</span>
+                      <span>{device.connected ? 'Connected' : 'Disconnected'}</span>
+                    </div>
+                  </div>
+
                   {/* GitHub Configuration */}
                   {hasGitHubConfig && (
                     <div className="border rounded-lg p-4 space-y-3">
+                      <h4 className="font-medium text-gray-900 mb-2">GitHub Configuration</h4>
                       <div className="flex items-center text-gray-600">
                         <FaGithub className="w-5 h-5 mr-2" />
                         <a
@@ -56,6 +77,10 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                       <div className="flex items-center text-gray-600">
                         <FaFolder className="w-5 h-5 mr-2" />
                         <span>Path: {device.repo_path}</span>
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <span className="font-medium w-24">Status:</span>
+                        <span>{device.github_status || 'Not checked'}</span>
                       </div>
                     </div>
                   )}
