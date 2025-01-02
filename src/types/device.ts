@@ -1,39 +1,30 @@
-export type DeviceType = 'Thermostat' | 'Light' | 'Lock' | 'Camera';
-
-export type DeviceStatus = 'Normal' | 'Warning' | 'High' | 'Error';
+export type DeviceStatus = 'Normal' | 'Warning' | 'High' | 'Error' | 'awaiting_connection';
 
 export interface Device {
   id: string;
   title: string;
-  type: DeviceType;
-  value: number;
-  unit: string;
+  tag: string;
   status: DeviceStatus;
   auto_update: boolean;
   user_id: string;
-  connected: boolean;
-  last_connected: string;
-  // GitHub integration fields
-  repo_url?: string;
-  repo_branch?: string;
-  repo_path?: string;
-  github_token?: string;
-  github_username?: string;
-  github_status?: 'up-to-date' | 'updating' | 'error';
-  github_error?: string;
-  last_github_check?: string;
   created_at: string;
   updated_at: string;
-  isExpanded?: boolean;
+  device_token: string | null;
+  script_content: string | null;
+  github_status: string | null;
+  last_commit_sha: string | null;
+  repo_url: string | null;
+  repo_branch: string | null;
+  repo_path: string | null;
+  github_token: string | null;
+  github_username: string | null;
+  isExpanded?: boolean; // UI-only field
 }
 
 export interface CreateDeviceInput {
   title: string;
-  type: DeviceType;
-  value: number;
-  unit: string;
+  tag: string;
   auto_update: boolean;
-  // GitHub integration fields
   repo_url?: string;
   repo_branch?: string;
   repo_path?: string;

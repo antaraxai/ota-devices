@@ -29,7 +29,8 @@ export default function Dashboard() {
 
   const handleCreateDevice = async (data: CreateDeviceInput) => {
     try {
-      await createDevice(data);
+      const newDevice = await createDevice(data);
+      return newDevice;
     } catch (error) {
       console.error('Error creating device:', error);
       throw error;

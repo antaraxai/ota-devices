@@ -3,7 +3,7 @@ import { Device } from '../types';
 import { FaGithub, FaPencilAlt, FaTrash } from 'react-icons/fa';
 import { FiZap } from 'react-icons/fi';
 import { useDevices } from '../contexts/DeviceContext';
-import DeviceDetailsModal from './DeviceDetailsModal';
+import DeviceDrawer from './DeviceDrawer';
 
 interface DeviceCardProps {
   device: Device;
@@ -15,7 +15,8 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
   onUpdate
 }) => {
   const [isBlinking, setIsBlinking] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const { updateDevice, deleteDevice } = useDevices();
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -28,9 +29,24 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const handleEdit = async () => {
-    // You can implement edit functionality here
-    console.log('Edit device:', device.id);
+  const handleEdit = () => {
+    setIsEditMode(true);
+    setIsDrawerOpen(true);
+  };
+
+  const handleSave = async (updatedDevice: Device) => {
+    try {
+      await updateDevice(updatedDevice.id, updatedDevice);
+      setIsDrawerOpen(false);
+      setIsEditMode(false);
+    } catch (error) {
+      console.error('Error updating device:', error);
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setIsEditMode(false);
   };
 
   const handleDelete = async () => {
@@ -57,7 +73,6 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     }
   };
 
-
   return (
     <div className="bg-white rounded-lg p-6 shadow-md flex flex-col items-center">
       {/* Eyes */}
@@ -77,15 +92,23 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
       {/* Title and Type */}
       <h3 className="text-2xl font-bold text-gray-900 mb-2">{device.title}</h3>
 
- 
       {/* Status Badge */}
       <div className="mb-4">
         <span className={`inline-flex items-center px-4 py-1 rounded-full ${
-          device.status.toLowerCase() === 'online' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
+          device.status === 'online' 
+            ? 'bg-green-100 text-green-800'
+            : device.status === 'offline'
+            ? 'bg-red-100 text-red-800'
+            : device.status === 'Awaiting connection'
+            ? 'bg-yellow-50 text-yellow-600'
+            : 'bg-gray-100 text-gray-800'
         }`}>
-          <FiZap className="mr-2" /> {device.status}
+          <FiZap className={`mr-2 ${
+            device.status === 'Awaiting connection' ? 'animate-pulse' : ''
+          }`} />
+          {device.status === 'online' ? 'Online' :
+           device.status === 'offline' ? 'Offline' :
+           device.status}
         </span>
       </div>
 
@@ -94,9 +117,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         <div className="mb-4 flex items-center">
           <FaGithub className="mr-2" />
           <span className={`text-sm ${
+            device.github_status === 'up-to-date' ? 'text-green-500' :
             device.github_status === 'updating' ? 'text-blue-500' :
             device.github_status === 'error' ? 'text-red-500' :
-            device.github_status === 'up-to-date' ? 'text-green-500' :
             'text-gray-500'
           }`}>
             {device.github_status || 'Not checked'}
@@ -113,11 +136,6 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
           )}
         </div>
       )}
-
-      {/* Connection Status */}
-      <div className="mb-4 flex items-center text-gray-500">
-        <FiZap className="mr-2" /> {device.connected ? 'Connected' : 'Disconnected'}
-      </div>
 
       {/* Action Buttons */}
       <div className="flex space-x-4">
@@ -137,19 +155,23 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
       {/* Show More Button */}
       <button
-        onClick={() => setIsDetailsModalOpen(true)}
+        onClick={() => {
+          setIsEditMode(false);
+          setIsDrawerOpen(true);
+        }}
         className="mt-4 text-gray-500 hover:text-gray-700"
       >
         Show more
       </button>
 
-      {/* Details Modal */}
-      {isDetailsModalOpen && (
-        <DeviceDetailsModal
-          device={device}
-          onClose={() => setIsDetailsModalOpen(false)}
-        />
-      )}
+      {/* Device Drawer */}
+      <DeviceDrawer
+        device={device}
+        isOpen={isDrawerOpen}
+        isEdit={isEditMode}
+        onClose={handleCloseDrawer}
+        onSave={handleSave}
+      />
     </div>
   );
 };
