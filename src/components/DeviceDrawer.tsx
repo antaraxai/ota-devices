@@ -53,8 +53,8 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                   <span className="text-sm">{editedDevice.title}</span>
                 </div>
                 <div className="flex items-center text-gray-600">
-                  <span className="font-medium w-28">Type:</span>
-                  <span className="text-sm">{editedDevice.type}</span>
+                  <span className="font-medium w-28">Tag:</span>
+                  <span className="text-sm">{editedDevice.tag}</span>
                 </div>
                 <div className="flex items-center text-gray-600">
                   <span className="font-medium w-28">Status:</span>
@@ -190,11 +190,11 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                   />
                 </div>
                 <div className="flex items-center text-gray-600">
-                  <span className="font-medium w-28">Type:</span>
+                  <span className="font-medium w-28">Tag:</span>
                   <input
                     type="text"
                     className="flex-1 text-sm p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
-                    value={editedDevice.type}
+                    value={editedDevice.tag || ''}
                     onChange={(e) => handleInputChange('type', e.target.value)}
                   />
                 </div>

@@ -27,6 +27,7 @@ export interface Device {
   created_at: string;
   updated_at: string;
   isExpanded?: boolean;
+  tag: string;
 }
 
 export interface UpdatePackage {
