@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Device, CreateDeviceInput } from '../types/device';
+import { Device, CreateDeviceInput, DeviceType } from '../types/device';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-toastify';
 import { createClient } from '@supabase/supabase-js';
@@ -31,11 +31,21 @@ interface DeviceContextType {
   downloadGitHubFile: (deviceId: string) => Promise<string>;
   updateGitHubConfig: (id: string, config: Partial<CreateDeviceInput>) => Promise<void>;
   downloadDeviceScript: (deviceId: string) => Promise<void>;
+  generateDeviceScript: (device: Device) => Promise<string>;
+  downloadDeviceScriptFile: (device: Device) => Promise<void>;
 }
 
 const DeviceContext = createContext<DeviceContextType | undefined>(undefined);
 
-export function DeviceProvider({ children }: { children: React.ReactNode }) {
+export const useDeviceContext = () => {
+  const context = useContext(DeviceContext);
+  if (context === undefined) {
+    throw new Error('useDeviceContext must be used within a DeviceProvider');
+  }
+  return context;
+};
+
+export const DeviceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -78,8 +88,17 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
           },
           (payload) => {
             console.log('Received realtime update:', payload);
-            // Refresh devices when there's a change
-            refreshDevices();
+            // Update the specific device in the state
+            if (payload.eventType === 'UPDATE') {
+              setDevices(prevDevices => 
+                prevDevices.map(device => 
+                  device.id === payload.new.id ? { ...device, ...payload.new } : device
+                )
+              );
+            } else {
+              // For other events (INSERT, DELETE), refresh the full list
+              refreshDevices();
+            }
           }
         )
         .subscribe();
@@ -110,87 +129,54 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!user) throw new Error('User not authenticated');
 
-      // Create device record
+      const now = new Date().toISOString();
+      const deviceToken = crypto.randomUUID();
+
+      // Create device record with all required non-null fields
       const { data, error } = await supabase
         .from('devices')
         .insert([{
-          ...input,
+          title: input.title,
+          tag: input.tag,
           user_id: user.id,
-          status: 'Normal' as const,
+          auto_update: input.auto_update,
+          status: 'Awaiting connection',
+          created_at: now,
+          updated_at: now,
+          device_token: deviceToken,
+          // Optional GitHub fields
+          repo_url: input.repo_url || null,
+          repo_branch: input.repo_branch || null,
+          repo_path: input.repo_path || null,
+          github_token: input.github_token || null,
+          github_username: input.github_username || null,
+          github_status: null,
+          last_commit_sha: null,
+          script_content: null,
         }])
         .select()
         .single();
 
       if (error) {
         console.error('Error creating device record:', error);
+        toast.error('Failed to create device');
         throw error;
       }
-      if (!data) throw new Error('Failed to create device');
 
-      try {
-        // Get template from storage
-        console.log('Getting device template...');
-        const templateText = await getDeviceTemplate();
-
-        // Generate device token
-        const deviceToken = crypto.randomUUID();
-
-        // Update device with token
-        const { error: tokenError } = await supabase
-          .from('devices')
-          .update({ device_token: deviceToken })
-          .eq('id', data.id)
-          .eq('user_id', user?.id);
-
-        if (tokenError) {
-          console.error('Error updating device token:', tokenError);
-          throw tokenError;
-        }
-
-        // Customize the template
-        const customizedScript = templateText
-          .replace('{{DEVICE_ID}}', data.id)
-          .replace('{{DEVICE_TYPE}}', data.type)
-          .replace('{{DEVICE_TITLE}}', data.title)
-          .replace('{{SUPABASE_URL}}', SUPABASE_URL)
-          .replace('{{SUPABASE_KEY}}', SERVICE_ROLE_KEY)
-          .replace('{{USER_ID}}', user?.id || '')
-          .replace('{{DEVICE_TOKEN}}', deviceToken)
-          .replace('{{API_URL}}', 'http://localhost:5173')
-          .replace('{{GITHUB_TOKEN}}', '')
-          .replace('{{GITHUB_REPO}}', '')
-          .replace('{{GITHUB_BRANCH}}', 'main')
-          .replace('{{GITHUB_PATH}}', '');
-
-        // Upload the customized script
-        console.log('Uploading device script...');
-        const { error: uploadError } = await serviceRoleClient.storage
-          .from('device-scripts')
-          .upload(`${data.id}/device-script.py`, customizedScript, {
-            contentType: 'text/x-python',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error('Error uploading script:', uploadError);
-          throw uploadError;
-        }
-
-        console.log('Device script uploaded successfully');
-        
-        // Download the script automatically
-        await downloadDeviceScript(data.id);
-      } catch (storageError) {
-        console.error('Storage operation failed:', storageError);
-        toast.warning('Device created but script operation failed');
+      if (!data) {
+        const error = new Error('Failed to create device');
+        console.error(error);
+        toast.error('Failed to create device');
+        throw error;
       }
 
+      // Update the devices list
       setDevices(prev => [data, ...prev]);
       toast.success('Device created successfully');
+
       return data;
     } catch (error) {
       console.error('Error in createDevice:', error);
-      toast.error('Failed to create device');
       throw error;
     }
   };
@@ -351,30 +337,147 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const downloadDeviceScript = async (deviceId: string) => {
+  const generateDeviceScript = async (device: Device): Promise<string> => {
     try {
-      const { data, error } = await serviceRoleClient.storage
+      console.log('Generating device script for device:', device.id);
+      
+      // Read the template script from device-scripts bucket, templates folder using service role client
+      const { data: scriptTemplate, error: scriptError } = await serviceRoleClient
+        .storage
         .from('device-scripts')
-        .download(`${deviceId}/device-script.py`);
+        .download('templates/final-device-script.py');
 
-      if (error) {
-        console.error('Error downloading script:', error);
+      if (scriptError) {
+        console.error('Error downloading template:', scriptError);
+        toast.error('Failed to download script template');
+        throw scriptError;
+      }
+
+      if (!scriptTemplate) {
+        const error = new Error('Template script not found');
+        console.error(error);
+        toast.error('Script template not found');
         throw error;
       }
 
-      // Create blob and download link
-      const blob = new Blob([await data.text()], { type: 'text/x-python' });
-      const url = window.URL.createObjectURL(blob);
+      console.log('Template script downloaded successfully');
+
+      // Convert blob to text
+      const templateText = await scriptTemplate.text();
+      console.log('Template text loaded');
+
+      // Replace placeholders with actual values
+      const customizedScript = templateText
+        .replace('SUPABASE_URL = "your-supabase-url"', `SUPABASE_URL = "${SUPABASE_URL}"`)
+        .replace('SUPABASE_KEY = "your-supabase-key"', `SUPABASE_KEY = "${SERVICE_ROLE_KEY}"`)
+        .replace('DEVICE_ID = "your-device-id"', `DEVICE_ID = "${device.id}"`);
+
+      console.log('Script customized with device values');
+
+      // Upload the customized script to the device's folder using service role client
+      const fileName = `devices/${device.id}/device-script.py`;
+      const { error: uploadError } = await serviceRoleClient
+        .storage
+        .from('device-scripts')
+        .upload(fileName, new Blob([customizedScript], { type: 'text/plain' }), {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Error uploading customized script:', uploadError);
+        toast.error('Failed to generate device script');
+        throw uploadError;
+      }
+
+      console.log('Customized script uploaded successfully');
+      return fileName;
+    } catch (error) {
+      console.error('Error generating device script:', error);
+      throw error;
+    }
+  };
+
+  const downloadDeviceScript = async (deviceId: string) => {
+    try {
+      const fileName = await generateDeviceScript({ id: deviceId } as Device);
+      
+      // Get the download URL
+      const { data, error } = await supabase
+        .storage
+        .from('device-scripts')
+        .createSignedUrl(fileName, 3600); // URL valid for 1 hour
+
+      if (error) {
+        console.error('Error creating signed URL:', error);
+        throw error;
+      }
+
+      if (!data?.signedUrl) {
+        throw new Error('Failed to get download URL');
+      }
+
+      // Create a temporary link to trigger the download
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `device-script.py`;
+      link.href = data.signedUrl;
+      link.download = 'device-script.py';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error in downloadDeviceScript:', error);
+      console.error('Error downloading device script:', error);
+      throw error;
+    }
+  };
+
+  const downloadDeviceScriptFile = async (device: Device): Promise<void> => {
+    try {
+      console.log('Starting script download for device:', device.id);
+      const fileName = await generateDeviceScript(device);
+      
+      console.log('Getting file content for:', fileName);
+      // Get the file content directly
+      const { data, error } = await serviceRoleClient
+        .storage
+        .from('device-scripts')
+        .download(fileName);
+
+      if (error) {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download script');
+        throw error;
+      }
+
+      if (!data) {
+        const error = new Error('Failed to get file content');
+        console.error(error);
+        toast.error('Failed to download script');
+        throw error;
+      }
+
+      console.log('File content retrieved successfully');
+
+      // Create a blob from the file content
+      const blob = new Blob([data], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary link to trigger the download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'device-script.py'; // Force download with specific filename
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('Download initiated');
+      toast.success('Device script downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading device script:', error);
       toast.error('Failed to download device script');
+      throw error;
     }
   };
 
@@ -388,7 +491,9 @@ export function DeviceProvider({ children }: { children: React.ReactNode }) {
     toggleAutoUpdate,
     downloadGitHubFile,
     updateGitHubConfig,
-    downloadDeviceScript
+    downloadDeviceScript,
+    generateDeviceScript,
+    downloadDeviceScriptFile
   };
 
   return (

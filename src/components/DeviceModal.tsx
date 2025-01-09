@@ -1,28 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Device, DeviceType, CreateDeviceInput } from '../types/device';
+import { useDeviceContext } from '../contexts/DeviceContext';
+import { supabase } from '../lib/supabase';
 
 interface DeviceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateDeviceInput) => Promise<void>;
+  onSubmit: (data: CreateDeviceInput) => Promise<Device>;
   device?: Device;
   title: string;
 }
-
-const unitsByType: Record<DeviceType, string> = {
-  Thermostat: '°C',
-  Light: 'lm',
-  Lock: '%',
-  Camera: 'fps'
-};
 
 export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }: DeviceModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<CreateDeviceInput>({
     title: '',
-    type: 'Thermostat',
-    value: 0,
-    unit: '°C',
+    tag: '',
     auto_update: false,
     repo_url: '',
     repo_branch: 'main',
@@ -30,15 +23,16 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
     github_token: '',
     github_username: '',
   });
+  const [createdDevice, setCreatedDevice] = useState<Device | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { downloadDeviceScriptFile } = useDeviceContext();
 
   useEffect(() => {
     if (device) {
       setFormData({
         title: device.title,
-        type: device.type,
-        value: device.value,
-        unit: device.unit,
+        tag: device.tag,
         auto_update: device.auto_update,
         repo_url: device.repo_url || '',
         repo_branch: device.repo_branch || 'main',
@@ -49,9 +43,7 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
     } else {
       setFormData({
         title: '',
-        type: 'Thermostat',
-        value: 0,
-        unit: '°C',
+        tag: '',
         auto_update: false,
         repo_url: '',
         repo_branch: 'main',
@@ -61,36 +53,62 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
       });
     }
     setCurrentStep(1);
+    setCreatedDevice(null);
   }, [device, isOpen]);
+
+  useEffect(() => {
+    if (createdDevice) {
+      // Subscribe to device updates
+      const channel = supabase
+        .channel(`device_${createdDevice.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'devices',
+            filter: `id=eq.${createdDevice.id}`
+          },
+          (payload) => {
+            console.log('Device update:', payload);
+            setCreatedDevice(prev => ({
+              ...prev!,
+              ...payload.new
+            }));
+          }
+        )
+        .subscribe();
+
+      // Cleanup subscription
+      return () => {
+        channel.unsubscribe();
+      };
+    }
+  }, [createdDevice?.id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
-    if (name === 'type') {
-      setFormData(prev => ({
-        ...prev,
-        type: value as DeviceType,
-        unit: unitsByType[value as DeviceType]
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentStep === 1) {
-      setCurrentStep(2);
-      return;
-    }
-
-    setIsSubmitting(true);
     try {
-      await onSubmit(formData);
-      onClose();
+      if (currentStep === 1) {
+        setCurrentStep(2);
+      } else if (currentStep === 2) {
+        setIsSubmitting(true);
+        console.log('Creating device with data:', formData);
+        const newDevice = await onSubmit(formData);
+        console.log('Device created:', newDevice);
+        setCreatedDevice(newDevice);
+        setCurrentStep(3);
+      } else {
+        onClose();
+      }
     } catch (error) {
       console.error('Error submitting device:', error);
     } finally {
@@ -98,223 +116,205 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
     }
   };
 
-  const handleBack = () => {
-    setCurrentStep(1);
+  const handleDownloadAgent = async () => {
+    console.log('Current device:', createdDevice);
+    if (!createdDevice) {
+      console.error('No device created yet');
+      return;
+    }
+
+    try {
+      await downloadDeviceScriptFile(createdDevice);
+    } catch (error) {
+      console.error('Error downloading agent:', error);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg w-full max-w-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Step {currentStep} of 2: {currentStep === 1 ? 'Basic Information' : 'GitHub Integration'}
-              </p>
-            </div>
+            <h2 className="text-xl font-semibold">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 focus:outline-none"
+              className="text-gray-500 hover:text-gray-700"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <form onSubmit={handleSubmit}>
             {currentStep === 1 ? (
-              // Step 1: Basic Device Information
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    placeholder="Enter device name"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type</label>
-                  <div className="relative">
-                    <select
-                      name="type"
-                      value={formData.type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none bg-white text-sm"
-                    >
-                      <option value="Thermostat">Thermostat</option>
-                      <option value="Light">Light</option>
-                      <option value="Lock">Lock</option>
-                      <option value="Camera">Camera</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              <>
+                <h3 className="text-2xl font-normal text-gray-900 mb-8">Step 1 of 3: Basic Information</h3>
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+                    <label className="block text-lg text-gray-700 mb-2">Device Name</label>
                     <input
-                      type="number"
-                      name="value"
-                      value={formData.value}
+                      type="text"
+                      name="title"
+                      value={formData.title}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="Enter device name"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                    <label className="block text-lg text-gray-700 mb-2">Device Tag</label>
                     <input
                       type="text"
-                      name="unit"
-                      value={formData.unit}
+                      name="tag"
+                      value={formData.tag}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 rounded-md border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed text-sm"
-                      readOnly
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter device tag (e.g., thermostat, light, camera)"
+                      required
                     />
+                    <p className="mt-1 text-sm text-gray-500">
+                      This tag helps identify and group your devices
+                    </p>
+                  </div>
+
+                  <div className="flex items-center pt-4">
+                    <input
+                      type="checkbox"
+                      name="auto_update"
+                      checked={formData.auto_update}
+                      onChange={handleChange}
+                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label className="ml-3 text-lg text-gray-700">
+                      Enable Auto Update
+                    </label>
                   </div>
                 </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="auto_update"
-                    checked={formData.auto_update}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label className="ml-2 block text-sm text-gray-700">
-                    Enable Auto Update
-                  </label>
-                </div>
-              </div>
-            ) : (
-              // Step 2: GitHub Integration
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
-                  <input
-                    type="url"
-                    name="repo_url"
-                    value={formData.repo_url}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    placeholder="https://github.com/username/repository"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+              </>
+            ) : currentStep === 2 ? (
+              <>
+                <h3 className="text-2xl font-normal text-gray-900 mb-8">Step 2 of 3: GitHub Integration</h3>
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                    <label className="block text-lg text-gray-700 mb-2">Repository URL</label>
+                    <input
+                      type="text"
+                      name="repo_url"
+                      value={formData.repo_url}
+                      onChange={handleChange}
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="https://github.com/username/repo"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-lg text-gray-700 mb-2">Branch</label>
                     <input
                       type="text"
                       name="repo_branch"
                       value={formData.repo_branch}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                       placeholder="main"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Path</label>
+                    <label className="block text-lg text-gray-700 mb-2">File Path</label>
                     <input
                       type="text"
                       name="repo_path"
                       value={formData.repo_path}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                      placeholder="/path/to/file"
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="path/to/file.py"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-lg text-gray-700 mb-2">GitHub Username</label>
+                    <input
+                      type="text"
+                      name="github_username"
+                      value={formData.github_username}
+                      onChange={handleChange}
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="username"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-lg text-gray-700 mb-2">GitHub Token</label>
+                    <input
+                      type="password"
+                      name="github_token"
+                      value={formData.github_token}
+                      onChange={handleChange}
+                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="ghp_xxxxxxxxxxxxxx"
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Username</label>
-                  <input
-                    type="text"
-                    name="github_username"
-                    value={formData.github_username}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    placeholder="Your GitHub username"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Personal Access Token
-                    <span className="ml-1 text-xs text-gray-500">(stored securely)</span>
-                  </label>
-                  <input
-                    type="password"
-                    name="github_token"
-                    value={formData.github_token}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Requires repo scope access.{' '}
-                    <a
-                      href="https://github.com/settings/tokens"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-500"
+              </>
+            ) : (
+              <>
+                <h3 className="text-2xl font-normal text-gray-900 mb-8">Step 3 of 3: Download Agent</h3>
+                <div className="space-y-6">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm font-medium text-gray-500">Status</span>
+                      <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                        createdDevice?.status === 'online'
+                          ? 'bg-green-100 text-green-800'
+                          : createdDevice?.status === 'offline'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {createdDevice?.status === 'online' ? 'Online' :
+                         createdDevice?.status === 'offline' ? 'Offline' :
+                         'Awaiting connection'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 mb-4">
+                      {createdDevice?.status === 'online' 
+                        ? 'Your device is connected and ready to use.'
+                        : createdDevice?.status === 'offline'
+                        ? 'Your device is currently offline. Please check the connection.'
+                        : 'Your device has been created. Download and install the agent on your device to establish the connection.'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadAgent}
+                      className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
-                      Create token
-                    </a>
-                  </p>
+                      Download Agent
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
-            <div className="flex justify-end space-x-3 pt-4">
-              {currentStep === 2 && (
+            <div className="mt-6 flex justify-end space-x-3">
+              {currentStep > 1 && (
                 <button
                   type="button"
-                  onClick={handleBack}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Back
                 </button>
               )}
               <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                {isSubmitting ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Saving...
-                  </div>
-                ) : currentStep === 1 ? 'Next' : 'Save Device'}
+                {currentStep === 3 ? 'Done' : (currentStep === 2 ? (isSubmitting ? 'Creating...' : 'Create') : 'Next')}
               </button>
             </div>
           </form>
