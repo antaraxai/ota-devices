@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "3000:80"
+    networks:
+      - app-network
     depends_on:
       - backend
 
@@ -19,4 +21,10 @@ services:
     environment:
       - GITLAB_USERNAME=${GITLAB_USERNAME:-gitlab+deploy-token-6867370}
       - GITLAB_TOKEN=${GITLAB_TOKEN:-gldt-kcGncapSUAPx9BPW4cxC}
+    networks:
+      - app-network
     restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
