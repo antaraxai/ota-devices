@@ -4,6 +4,8 @@ import subprocess
 from urllib.parse import urlparse, urlunparse
 from datetime import datetime
 from supabase import create_client, Client
+import signal
+import sys
 
 # Supabase configuration
 SUPABASE_URL = "https://hdodriygzudamnqqbluy.supabase.co"
@@ -361,9 +363,36 @@ class GitLabMonitor:
             self.check_and_update()
             time.sleep(self.check_interval)
 
+def signal_handler(signum, frame):
+    print("\nUpdating device status to OFFLINE before exiting...")
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase.table('devices').update({"status": "OFFLINE"}).eq('device_token', DEVICE_TOKEN).execute()
+        print("Device status updated to OFFLINE")
+    except Exception as e:
+        print(f"Error updating device status: {e}")
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 def main():
-    monitor = GitLabMonitor()
-    monitor.monitor()
+    try:
+        # Update device status to ONLINE when script starts
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase.table('devices').update({"status": "ONLINE"}).eq('device_token', DEVICE_TOKEN).execute()
+        print("Device status updated to ONLINE")
+        
+        monitor = GitLabMonitor()
+        monitor.monitor()
+
+    except Exception as e:
+        print(f"Error in main: {e}")
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase.table('devices').update({"status": "OFFLINE"}).eq('device_token', DEVICE_TOKEN).execute()
+        print("Device status updated to OFFLINE")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
