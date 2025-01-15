@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Device } from '../types';
-import { FaGithub, FaCodeBranch, FaFolder, FaInfo, FaPencilAlt, FaComments } from 'react-icons/fa';
+import { FaGithub, FaCodeBranch, FaFolder, FaInfo, FaPencilAlt, FaComments, FaDownload } from 'react-icons/fa';
+import { format } from 'date-fns';
+import { useDevices } from '../contexts/DeviceContext';
+import { toast } from 'react-toastify';
 
 type TabType = 'info' | 'edit' | 'chat';
 
@@ -19,7 +22,9 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [editedDevice, setEditedDevice] = useState<Device>(device);
+  const [isDownloading, setIsDownloading] = useState(false);
   const hasGitHubConfig = Boolean(device.repo_url && device.repo_path && device.github_token);
+  const { updateDevice, downloadDeviceScriptFile } = useDevices();
 
   useEffect(() => {
     setEditedDevice(device);
@@ -37,11 +42,70 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     setActiveTab('info');
   };
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Not available';
+    return format(new Date(dateString), 'PPpp');
+  };
+
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      await downloadDeviceScriptFile(device);
+      toast.success('Script downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading script:', error);
+      toast.error('Failed to download script');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'info':
         return (
           <div className="space-y-8">
+            {/* Installation Details */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
+                Installation Details
+              </h3>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">Status:</span>
+                  <span className={`text-sm px-3 py-1 rounded-full ${
+                    editedDevice.installation_status === 'Installed'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {editedDevice.installation_status || 'Not Installed'}
+                  </span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">Last Download:</span>
+                  <span className="text-sm">
+                    {formatDate(editedDevice.timestamp_download)}
+                  </span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">First Install:</span>
+                  <span className="text-sm">
+                    {formatDate(editedDevice.timestamp_first_install)}
+                  </span>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    className="flex items-center text-blue-500 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                  >
+                    <FaDownload className="mr-2" />
+                    {isDownloading ? 'Downloading...' : 'Download Latest Script'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Basic Device Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
@@ -174,6 +238,47 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       case 'edit':
         return (
           <div className="space-y-8">
+            {/* Installation Details */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
+                Installation Details
+              </h3>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">Status:</span>
+                  <span className={`text-sm px-3 py-1 rounded-full ${
+                    editedDevice.installation_status === 'Installed'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {editedDevice.installation_status || 'Not Installed'}
+                  </span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">Last Download:</span>
+                  <span className="text-sm">
+                    {formatDate(editedDevice.timestamp_download)}
+                  </span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <span className="font-medium w-36">First Install:</span>
+                  <span className="text-sm">
+                    {formatDate(editedDevice.timestamp_first_install)}
+                  </span>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    className="flex items-center text-blue-500 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                  >
+                    <FaDownload className="mr-2" />
+                    {isDownloading ? 'Downloading...' : 'Download Latest Script'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Basic Device Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">

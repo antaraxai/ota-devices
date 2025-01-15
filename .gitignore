@@ -3,3 +3,10 @@ node_modules
 python/testing-download/temp-git/
 python/testing-download/src/templates/index.html
 python/testing-download/repo-clone/
+.last_commit
+python/.last_commit
+python/.last_commit
+.last_commit
+python/src/templates/index.html
+python/testing-download/.last_commit
+src/templates/index.html

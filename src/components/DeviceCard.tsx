@@ -161,7 +161,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         }}
         className="mt-4 text-gray-500 hover:text-gray-700"
       >
-        Show more
+        View Detail
       </button>
 
       {/* Device Drawer */}

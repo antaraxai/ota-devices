@@ -28,6 +28,10 @@ export interface Device {
   updated_at: string;
   isExpanded?: boolean;
   tag: string;
+  // Installation details
+  timestamp_download?: string;
+  timestamp_first_install?: string;
+  installation_status?: 'Installed' | 'Not Installed';
 }
 
 export interface UpdatePackage {

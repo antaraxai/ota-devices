@@ -1,4 +1,4 @@
-export type DeviceStatus = 'Normal' | 'Warning' | 'High' | 'Error' | 'awaiting_connection';
+export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'UPDATING' | 'ERROR' | 'MAINTENANCE';
 
 export interface Device {
   id: string;
@@ -13,18 +13,21 @@ export interface Device {
   script_content: string | null;
   github_status: string | null;
   last_commit_sha: string | null;
-  repo_url: string | null;
-  repo_branch: string | null;
-  repo_path: string | null;
-  github_token: string | null;
-  github_username: string | null;
+  repo_url?: string;
+  repo_branch?: string;
+  repo_path?: string;
+  repo_type?: 'github' | 'gitlab';
+  github_token?: string;
+  github_username?: string;
   isExpanded?: boolean; // UI-only field
+  timestamp_download?: string;
 }
 
 export interface CreateDeviceInput {
   title: string;
   tag: string;
   auto_update: boolean;
+  repo_type?: 'github' | 'gitlab';
   repo_url?: string;
   repo_branch?: string;
   repo_path?: string;

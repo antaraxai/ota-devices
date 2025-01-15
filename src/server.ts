@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { supabase } from './lib/supabase.js';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
 const port = process.env.PORT || 5173;
@@ -56,6 +58,53 @@ app.post('/api/devices/:deviceId/readings', async (req, res) => {
   } catch (error) {
     console.error('Error updating reading:', error);
     res.status(500).json({ error: 'Failed to update reading' });
+  }
+});
+
+app.post('/api/devices/:deviceId/connection', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { status } = req.body;
+    
+    const { error } = await supabase
+      .from('devices')
+      .update({
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', deviceId);
+
+    if (error) throw error;
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating device status:', error);
+    res.status(500).json({ error: 'Failed to update device status' });
+  }
+});
+
+app.post('/api/devices/:deviceId/readings', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const readings = req.body;
+    
+    // Add device_id and timestamp to readings
+    const readingsWithMeta = {
+      ...readings,
+      device_id: deviceId,
+      created_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabase
+      .from('device_readings')
+      .insert([readingsWithMeta]);
+
+    if (error) throw error;
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving device readings:', error);
+    res.status(500).json({ error: 'Failed to save device readings' });
   }
 });
 

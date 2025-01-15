@@ -17,6 +17,7 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
     title: '',
     tag: '',
     auto_update: false,
+    repo_type: 'github',
     repo_url: '',
     repo_branch: 'main',
     repo_path: '',
@@ -34,6 +35,7 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
         title: device.title,
         tag: device.tag,
         auto_update: device.auto_update,
+        repo_type: device.repo_type || 'github',
         repo_url: device.repo_url || '',
         repo_branch: device.repo_branch || 'main',
         repo_path: device.repo_path || '',
@@ -45,6 +47,7 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
         title: '',
         tag: '',
         auto_update: false,
+        repo_type: 'github',
         repo_url: '',
         repo_branch: 'main',
         repo_path: '',
@@ -88,10 +91,39 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
+    
+    // Handle repo_type change specially
+    if (name === 'repo_type') {
+      if (value === 'gitlab') {
+        // Set hardcoded values for GitLab
+        setFormData(prev => ({
+          ...prev,
+          repo_type: 'gitlab',
+          repo_url: 'https://gitlab.com/reka-dev/underground/antara',
+          repo_branch: 'main',
+          repo_path: 'src/templates/index.html',
+          github_token: 'gldt-kcGncapSUAPx9BPW4cxC',
+          github_username: 'gitlab+deploy-token-6867370'
+        }));
+      } else {
+        // Reset values for GitHub
+        setFormData(prev => ({
+          ...prev,
+          repo_type: 'github',
+          repo_url: '',
+          repo_branch: 'main',
+          repo_path: '',
+          github_token: '',
+          github_username: ''
+        }));
+      }
+    } else {
+      // Handle other form field changes normally
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -198,67 +230,113 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
               </>
             ) : currentStep === 2 ? (
               <>
-                <h3 className="text-2xl font-normal text-gray-900 mb-8">Step 2 of 3: GitHub Integration</h3>
+                <h3 className="text-2xl font-normal text-gray-900 mb-8">
+                  Step 2 of 3: Repository Integration
+                </h3>
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-lg text-gray-700 mb-2">Repository URL</label>
-                    <input
-                      type="text"
-                      name="repo_url"
-                      value={formData.repo_url}
+                    <label className="block text-lg text-gray-700 mb-2">Repository Type</label>
+                    <select
+                      name="repo_type"
+                      value={formData.repo_type}
                       onChange={handleChange}
-                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="https://github.com/username/repo"
-                    />
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="github">GitHub</option>
+                      <option value="gitlab">GitLab</option>
+                    </select>
                   </div>
 
-                  <div>
-                    <label className="block text-lg text-gray-700 mb-2">Branch</label>
-                    <input
-                      type="text"
-                      name="repo_branch"
-                      value={formData.repo_branch}
-                      onChange={handleChange}
-                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="main"
-                    />
-                  </div>
+                  {formData.repo_type === 'github' ? (
+                    <>
+                      <div>
+                        <label className="block text-lg text-gray-700 mb-2">Repository URL</label>
+                        <input
+                          type="text"
+                          name="repo_url"
+                          value={formData.repo_url}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="https://github.com/username/repo"
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-lg text-gray-700 mb-2">File Path</label>
-                    <input
-                      type="text"
-                      name="repo_path"
-                      value={formData.repo_path}
-                      onChange={handleChange}
-                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="path/to/file.py"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-lg text-gray-700 mb-2">Branch</label>
+                        <input
+                          type="text"
+                          name="repo_branch"
+                          value={formData.repo_branch}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="main"
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-lg text-gray-700 mb-2">GitHub Username</label>
-                    <input
-                      type="text"
-                      name="github_username"
-                      value={formData.github_username}
-                      onChange={handleChange}
-                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="username"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-lg text-gray-700 mb-2">File Path</label>
+                        <input
+                          type="text"
+                          name="repo_path"
+                          value={formData.repo_path}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="path/to/file.py"
+                          required
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-lg text-gray-700 mb-2">GitHub Token</label>
-                    <input
-                      type="password"
-                      name="github_token"
-                      value={formData.github_token}
-                      onChange={handleChange}
-                      className="block w-full rounded-lg border-gray-300 bg-gray-50 p-3 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="ghp_xxxxxxxxxxxxxx"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-lg text-gray-700 mb-2">GitHub Username</label>
+                        <input
+                          type="text"
+                          name="github_username"
+                          value={formData.github_username}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="username"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-lg text-gray-700 mb-2">GitHub Token</label>
+                        <input
+                          type="password"
+                          name="github_token"
+                          value={formData.github_token}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter your GitHub token"
+                          required
+                        />
+                        <p className="mt-1 text-sm text-gray-500">
+                          Create a GitHub Personal Access Token with repo scope
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-white rounded-lg p-6 border border-gray-200">
+                      <h4 className="text-xl mb-4 text-gray-900">Importing from GitLab</h4>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          <svg className="w-6 h-6 text-[#FC6D26] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.955 13.587l-1.342-4.135-2.664-8.189a.455.455 0 0 0-.867 0L16.418 9.45H7.582L4.918 1.263a.455.455 0 0 0-.867 0L1.387 9.452.045 13.587a.924.924 0 0 0 .331 1.023L12 23.054l11.624-8.443a.924.924 0 0 0 .331-1.024" />
+                          </svg>
+                          <span className="text-lg text-gray-900">reka-dev/underground/antara</span>
+                        </div>
+                        <div className="flex items-center bg-gray-100 px-3 py-1 rounded-lg w-fit">
+                          <svg className="w-4 h-4 mr-2 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M6 3v12m0 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm12 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 0V8a2 2 0 0 0-2-2h-4l-2-2" />
+                          </svg>
+                          <span className="text-gray-700">main</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -269,23 +347,28 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-sm font-medium text-gray-500">Status</span>
                       <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
-                        createdDevice?.status === 'online'
+                        createdDevice?.status === 'ONLINE'
                           ? 'bg-green-100 text-green-800'
-                          : createdDevice?.status === 'offline'
+                          : createdDevice?.status === 'OFFLINE'
                           ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                          : createdDevice?.status === 'AWAITING_CONNECTION'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {createdDevice?.status === 'online' ? 'Online' :
-                         createdDevice?.status === 'offline' ? 'Offline' :
-                         'Awaiting connection'}
+                        {createdDevice?.status === 'ONLINE' ? 'Online' :
+                         createdDevice?.status === 'OFFLINE' ? 'Offline' :
+                         createdDevice?.status === 'AWAITING_CONNECTION' ? 'Awaiting connection' :
+                         'Unknown'}
                       </span>
                     </div>
                     <div className="text-sm text-gray-600 mb-4">
-                      {createdDevice?.status === 'online' 
+                      {createdDevice?.status === 'ONLINE' 
                         ? 'Your device is connected and ready to use.'
-                        : createdDevice?.status === 'offline'
+                        : createdDevice?.status === 'OFFLINE'
                         ? 'Your device is currently offline. Please check the connection.'
-                        : 'Your device has been created. Download and install the agent on your device to establish the connection.'}
+                        : createdDevice?.status === 'AWAITING_CONNECTION'
+                        ? 'Your device has been created. Download and install the agent on your device to establish the connection.'
+                        : 'Device status unknown.'}
                     </div>
                     <button
                       type="button"
