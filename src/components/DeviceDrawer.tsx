@@ -73,12 +73,19 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                 <div className="flex items-center text-gray-600">
                   <span className="font-medium w-36">Status:</span>
-                  <span className={`text-sm px-3 py-1 rounded-full ${
-                    editedDevice.installation_status === 'Installed'
+                  <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                    editedDevice.status === 'ONLINE'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
+                      : editedDevice.status === 'OFFLINE'
+                      ? 'bg-red-100 text-red-800'
+                      : editedDevice.status === 'AWAITING_CONNECTION'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {editedDevice.installation_status || 'Not Installed'}
+                    {editedDevice.status === 'ONLINE' ? 'Online' :
+                     editedDevice.status === 'OFFLINE' ? 'Offline' :
+                     editedDevice.status === 'AWAITING_CONNECTION' ? 'Awaiting connection' :
+                     'Unknown'}
                   </span>
                 </div>
                 <div className="flex items-center text-gray-600">
@@ -122,12 +129,19 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 </div>
                 <div className="flex items-center text-gray-600">
                   <span className="font-medium w-28">Status:</span>
-                  <span className={`text-sm px-3 py-1 rounded-full ${
-                    editedDevice.status.toLowerCase() === 'online'
+                  <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                    editedDevice.status === 'ONLINE'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      : editedDevice.status === 'OFFLINE'
+                      ? 'bg-red-100 text-red-800'
+                      : editedDevice.status === 'AWAITING_CONNECTION'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {editedDevice.status}
+                    {editedDevice.status === 'ONLINE' ? 'Online' :
+                     editedDevice.status === 'OFFLINE' ? 'Offline' :
+                     editedDevice.status === 'AWAITING_CONNECTION' ? 'Awaiting connection' :
+                     'Unknown'}
                   </span>
                 </div>
               </div>
@@ -246,12 +260,19 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
               <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                 <div className="flex items-center text-gray-600">
                   <span className="font-medium w-36">Status:</span>
-                  <span className={`text-sm px-3 py-1 rounded-full ${
-                    editedDevice.installation_status === 'Installed'
+                  <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                    editedDevice.status === 'ONLINE'
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
+                      : editedDevice.status === 'OFFLINE'
+                      ? 'bg-red-100 text-red-800'
+                      : editedDevice.status === 'AWAITING_CONNECTION'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {editedDevice.installation_status || 'Not Installed'}
+                    {editedDevice.status === 'ONLINE' ? 'Online' :
+                     editedDevice.status === 'OFFLINE' ? 'Offline' :
+                     editedDevice.status === 'AWAITING_CONNECTION' ? 'Awaiting connection' :
+                     'Unknown'}
                   </span>
                 </div>
                 <div className="flex items-center text-gray-600">

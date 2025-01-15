@@ -94,22 +94,20 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
       {/* Status Badge */}
       <div className="mb-4">
-        <span className={`inline-flex items-center px-4 py-1 rounded-full ${
-          device.status === 'online' 
-            ? 'bg-green-100 text-green-800'
-            : device.status === 'offline'
-            ? 'bg-red-100 text-red-800'
-            : device.status === 'Awaiting connection'
-            ? 'bg-yellow-50 text-yellow-600'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          <FiZap className={`mr-2 ${
-            device.status === 'Awaiting connection' ? 'animate-pulse' : ''
-          }`} />
-          {device.status === 'online' ? 'Online' :
-           device.status === 'offline' ? 'Offline' :
-           device.status}
-        </span>
+        <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                  device.status === 'ONLINE'
+                    ? 'bg-green-100 text-green-800'
+                    : device.status === 'OFFLINE'
+                    ? 'bg-red-100 text-red-800'
+                    : device.status === 'AWAITING_CONNECTION'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {device.status === 'ONLINE' ? 'Online' :
+                   device.status === 'OFFLINE' ? 'Offline' :
+                   device.status === 'AWAITING_CONNECTION' ? 'Awaiting connection' :
+                   'Unknown'}
+                </span>
       </div>
 
       {/* GitHub Status (if applicable) */}

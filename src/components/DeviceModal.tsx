@@ -362,11 +362,11 @@ export default function DeviceModal({ isOpen, onClose, onSubmit, device, title }
                       </span>
                     </div>
                     <div className="text-sm text-gray-600 mb-4">
-                      {createdDevice?.status === 'ONLINE' 
+                      {createdDevice?.status === 'online' 
                         ? 'Your device is connected and ready to use.'
-                        : createdDevice?.status === 'OFFLINE'
+                        : createdDevice?.status === 'offline'
                         ? 'Your device is currently offline. Please check the connection.'
-                        : createdDevice?.status === 'AWAITING_CONNECTION'
+                        : createdDevice?.status === 'awaiting connection'
                         ? 'Your device has been created. Download and install the agent on your device to establish the connection.'
                         : 'Device status unknown.'}
                     </div>
