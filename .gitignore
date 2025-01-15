@@ -1,2 +1,5 @@
 node_modules
 .DS_Store
+python/testing-download/temp-git/
+python/testing-download/src/templates/index.html
+python/testing-download/repo-clone/
