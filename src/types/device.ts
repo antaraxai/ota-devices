@@ -3,7 +3,7 @@ export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'UPDATING' | 'ERROR' | 'MAINTE
 export interface Device {
   id: string;
   title: string;
-  tag: string;
+  device_tag: string;
   status: DeviceStatus;
   auto_update: boolean;
   user_id: string;
@@ -25,7 +25,7 @@ export interface Device {
 
 export interface CreateDeviceInput {
   title: string;
-  tag: string;
+  device_tag: string;
   auto_update: boolean;
   repo_type?: 'github' | 'gitlab';
   repo_url?: string;

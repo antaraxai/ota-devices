@@ -94,7 +94,7 @@ const DeviceTable: React.FC<DeviceTableProps> = ({
                       }`} 
                     />
                   </div>
-                  <div className="text-sm font-medium text-gray-900">{device.title}</div>
+                  <div className="text-sm font-medium text-gray-900">{device.device_tag}</div>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">

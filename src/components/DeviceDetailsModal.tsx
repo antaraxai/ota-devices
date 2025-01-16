@@ -53,6 +53,10 @@ export const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({
                       <span className="font-medium w-24">Connection:</span>
                       <span>{device.connected ? 'Connected' : 'Disconnected'}</span>
                     </div>
+                    <div className="flex items-center text-gray-600">
+                      <span className="font-medium w-36">Tag:</span>
+                      <span className="text-gray-900">{device.device_tag}</span>
+                    </div>
                   </div>
 
                   {/* GitHub Configuration */}

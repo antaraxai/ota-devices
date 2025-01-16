@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { toast } from 'react-toastify';
 import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
@@ -35,14 +34,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           // Check if script_content has changed
           if (newData.script_content !== oldData.script_content) {
             setUnreadCount(prev => prev + 1);
-            toast.info(`Device ${newData.title} has been updated from GitHub`, {
-              position: "top-right",
-              autoClose: 5000,
-              hideProgressBar: false,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-            });
           }
         }
       )
