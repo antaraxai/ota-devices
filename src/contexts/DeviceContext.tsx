@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Device, CreateDeviceInput, DeviceType } from '../types/device';
+import { Device, CreateDeviceInput } from '../types/device';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-toastify';
 import { createClient } from '@supabase/supabase-js';
 import templateContent from '../templates/gitlab-device-script.py?raw';
+import { v4 as uuidv4 } from 'uuid';
 
 // Create a separate client with service role for admin operations
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -100,8 +101,10 @@ const DeviceProvider: React.FC = ({ children }) => {
         throw new Error('User must be logged in to create a device');
       }
 
-      // Generate a UUID using the Web Crypto API
-      const deviceToken = crypto.randomUUID();
+      // Generate a UUID using crypto.randomUUID() if available, otherwise use uuid library
+      const deviceToken = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : uuidv4();
 
       const newDevice = {
         ...input,
