@@ -11,3 +11,5 @@ python/src/templates/index.html
 python/testing-download/.last_commit
 src/templates/index.html
 src/.DS_Store
+python/testing-download/test.py
+python/testing-download/device-script-prod.py
