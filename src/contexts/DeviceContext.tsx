@@ -4,6 +4,7 @@ import { Device, CreateDeviceInput, DeviceType } from '../types/device';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-toastify';
 import { createClient } from '@supabase/supabase-js';
+import templateContent from '../templates/gitlab-device-script.py?raw';
 
 // Create a separate client with service role for admin operations
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -78,7 +79,7 @@ const DeviceProvider: React.FC = ({ children }) => {
           table: 'devices'
         },
         (payload) => {
-          console.log('Received real-time update:', payload);
+          // console.log('Received real-time update:', payload);
           // Refresh the devices list
           fetchDevices();
         }
@@ -168,19 +169,20 @@ const DeviceProvider: React.FC = ({ children }) => {
     try {
       console.log('Generating device script for device:', device);
 
-      // Read the template file
-      const response = await fetch('/src/templates/gitlab-device-script.py');
-      const templateText = await response.text();
-      
-      console.log('Template loaded, length:', templateText.length);
+      // Use the imported template content
+      let scriptContent = templateContent;
+
+      console.log('Template loaded, length:', scriptContent.length);
 
       // Create a unique filename for this device's script
       const scriptFileName = `device-script-${device.id}.py`;
 
       // Replace placeholders with actual values
-      let scriptContent = templateText
+      scriptContent = scriptContent
         .replace(/DEVICE_ID = ".*"/, `DEVICE_ID = "${device.id}"`)
-        .replace(/DEVICE_TOKEN = ".*"/, `DEVICE_TOKEN = "${device.device_token}"`);
+        .replace(/DEVICE_TOKEN = ".*"/, `DEVICE_TOKEN = "${device.device_token}"`)
+        // .replace(/SUPABASE_URL = ".*"/, `SUPABASE_URL = "${import.meta.env.VITE_SUPABASE_URL}"`)
+        // .replace(/SUPABASE_KEY = ".*"/, `SUPABASE_KEY = "${import.meta.env.VITE_SUPABASE_ANON_KEY}"`);
 
       // Upload the customized script
       const { error: uploadError } = await serviceRoleClient.storage

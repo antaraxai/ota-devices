@@ -19,6 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the Python application
 COPY python/ .
 
+# Create the directory structure for templates
+RUN mkdir -p /app/src/templates
+
+COPY src /app/src
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 

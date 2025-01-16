@@ -1,26 +1,13 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  optimizeDeps: {
-    exclude: ['lucide-react'],
+  server: {
+    port: 5173,
   },
-  base: '/',
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
-    manifest: true,
-    rollupOptions: {
-      output: {
-        manualChunks: undefined
-      }
-    }
   },
-  server: {
-    host: true,
-    port: 3000,
-    strictPort: true
-  }
-});
+  assetsInclude: ['**/*.py'], // Move this to the root level
+})
