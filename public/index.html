@@ -2,9 +2,23 @@
 <html lang="en" >
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="30">  <!-- Auto-refresh every 30 seconds -->
   <title>Copy code to clipboard</title>
   <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/themes/prism-tomorrow.min.css'><link rel="stylesheet" href="./style.css">
-
+  <script>
+    // Add dynamic refresh functionality
+    function checkForUpdates() {
+      fetch(window.location.href + '?' + new Date().getTime())
+        .then(response => {
+          if (response.ok) {
+            window.location.reload();
+          }
+        })
+        .catch(error => console.error('Error checking for updates:', error));
+    }
+    // Check for updates every 30 seconds
+    setInterval(checkForUpdates, 30000);
+  </script>
 </head>
 <body>
 <!-- partial:index.partial.html -->
