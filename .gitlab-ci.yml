@@ -1,7 +1,11 @@
 # The Docker image that will be used to build your app
-image: node:lts
+image: alpine:latest
+
 # Functions that should be executed before the build script is run
 before_script: []
+
+variables:
+  GIT_DEPTH: 1  # Shallow clone for faster checkouts
 
 pages:
   script:
@@ -10,6 +14,12 @@ pages:
     paths:
       # The folder that contains the files to be exposed at the Page URL
       - public
+    expire_in: 1 week  # Artifacts will be deleted after 1 week
+  cache:
+    paths:
+      - public
+    key: ${CI_COMMIT_REF_SLUG}
+  interruptible: true  # Allows canceling redundant pipelines
   rules:
     # This ensures that only pushes to the default branch will trigger
     # a pages deploy
