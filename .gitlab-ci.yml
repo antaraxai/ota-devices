@@ -2,14 +2,21 @@
 image: alpine:latest
 
 # Functions that should be executed before the build script is run
-before_script: []
+before_script:
+  - apk add --no-cache rsync
 
 variables:
   GIT_DEPTH: 1  # Shallow clone for faster checkouts
 
 pages:
   script:
-    - echo "Deploying to GitLab Pages..."
+    - echo "Preparing GitLab Pages deployment..."
+    - rm -rf public || true
+    - mkdir -p public
+    - cp -r src/* public/ || true  # Copy from src if it exists
+    - cp -r pages/* public/ || true  # Copy from pages if it exists
+    - cp index.html public/ || true  # Copy root index.html if it exists
+    - ls -la public/  # List contents for debugging
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
