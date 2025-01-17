@@ -6,11 +6,21 @@ before_script: []
 pages:
   script:
     - echo "Deploying to GitLab Pages..."
-    # No need to modify the public directory, just use it as is
+    # Create .gitlab-ci.yml with cache control headers
+    - |
+      cat > public/.gitlab-ci.yml << 'EOF'
+      header_rules:
+        - pattern: '**/*'
+          headers:
+            Cache-Control: 'no-store, no-cache, must-revalidate, proxy-revalidate'
+            Pragma: 'no-cache'
+            Expires: '0'
+      EOF
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
       - public
+    expire_in: 1 hour  # Short expiration to force refresh
   rules:
     # This ensures that only pushes to the default branch will trigger
     # a pages deploy
