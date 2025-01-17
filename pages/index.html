@@ -1,55 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Antara Device Monitor</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-            color: #333;
-        }
-        .status {
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            background-color: #f3f4f6;
-            border: 1px solid #e5e7eb;
-        }
-        .timestamp {
-            color: #666;
-            font-size: 0.9em;
-        }
-        .device-info {
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 6px;
-            margin-top: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Copy code to clipboard</title>
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/themes/prism-tomorrow.min.css'><link rel="stylesheet" href="./style.css">
+
 </head>
 <body>
-    <h1>Antara Device Monitor</h1>
-    <div class="status">
-        <h2>Status: Online</h2>
-        <p>Device is running and monitoring changes.</p>
-        <div class="device-info">
-            <p><strong>Last Update:</strong> <span id="timestamp"></span></p>
-            <p><strong>Device ID:</strong> <span id="device-id">Loading...</span></p>
-        </div>
-    </div>
+<!-- partial:index.partial.html -->
+<main>
+  <h1>All hail the Clipboard API</h1>
+  <p>Florid, wordly code exposition.</p>
+  <pre><code class="language-css">.some-box {
+	width: 20px;
+	height: 20px;
+	background: brown;
+	margin-bottom: 1.5rem;
+}
+</code></pre>
+  <p>And I'll tell you another thing..</p>
+  <pre><code class="language-html">&lt;div class="box drop3"&gt;&lt;/div&gt;</code></pre>
+  <p>No! Not finished..</p>
+  <pre><code class="language-javascript">console.log("finished");</code></pre>
+</main>
+<!-- partial -->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/prism/1.26.0/prism.min.js'></script><script  src="./script.js"></script>
 
-    <script>
-        function updateTimestamp() {
-            document.getElementById('timestamp').textContent = new Date().toLocaleString();
-        }
-        updateTimestamp();
-        setInterval(updateTimestamp, 1000);
-    </script>
 </body>
 </html>
