@@ -1,11 +1,15 @@
 # The Docker image that will be used to build your app
-image: node:lts
+image: alpine:latest
 # Functions that should be executed before the build script is run
 before_script: []
 
 pages:
   script:
     - echo "Deploying to GitLab Pages..."
+    - mkdir -p public
+    - cp index.html public/
+    - cp -r public/* public/ || true
+    - cp style.css public/ || true
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
