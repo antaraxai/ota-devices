@@ -1,9 +1,16 @@
 # The Docker image that will be used to build your app
-image: $BUILD_IMAGE
+image: node:lts
 # Functions that should be executed before the build script is run
-before_script: $INSTALLATION_STEPS
+before_script: []
+
 pages:
-  script: $BUILD_STEPS
-    artifacts:
-        paths:
-              # The folder that contains the files to be exposed # The Docker image that will be used to build your app
+  script:
+    - echo "Deploying to GitLab Pages..."
+  artifacts:
+    paths:
+      # The folder that contains the files to be exposed at the Page URL
+      - public
+  rules:
+    # This ensures that only pushes to the default branch will trigger
+    # a pages deploy
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
