@@ -117,13 +117,8 @@ def clone_or_pull_repo(device_id: str, repo_url: str, branch: str = 'main') -> b
             # Repository exists, force pull updates
             log_with_timestamp(f"[INFO] Pulling updates for shared repo")
             
-            # Clean untracked files
-            subprocess.run(['git', 'clean', '-fd'], cwd=shared_repo, capture_output=True)
-            # Reset any changes
-            subprocess.run(['git', 'reset', '--hard', 'HEAD'], cwd=shared_repo, capture_output=True)
-            
             # Set git config for auth
-            subprocess.run(['git', 'config', 'credential.helper', 'store'], cwd=shared_repo, capture_output=True)
+            subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
             
             # Fetch and reset hard to origin
             subprocess.run(['git', 'fetch', 'origin'], cwd=shared_repo, capture_output=True)
@@ -150,17 +145,14 @@ def clone_or_pull_repo(device_id: str, repo_url: str, branch: str = 'main') -> b
             # Set git config globally
             subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
             
-            # Clone with force
+            # Clone without force flag
             result = subprocess.run(
-                ['git', 'clone', '-b', branch, '--force', auth_repo_url, shared_repo],
+                ['git', 'clone', '-b', branch, auth_repo_url, shared_repo],
                 capture_output=True,
                 text=True
             )
             
             if result.returncode == 0:
-                # Clean and reset after clone
-                subprocess.run(['git', 'clean', '-fd'], cwd=shared_repo, capture_output=True)
-                subprocess.run(['git', 'reset', '--hard', 'HEAD'], cwd=shared_repo, capture_output=True)
                 log_with_timestamp("[SUCCESS] Repository cloned successfully")
                 changes_detected = True
             else:
