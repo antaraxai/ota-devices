@@ -13,3 +13,5 @@ src/templates/index.html
 src/.DS_Store
 python/testing-download/test.py
 python/testing-download/device-script-prod.py
+*.pyc
+.DS_Store
