@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies with legacy peer deps to handle socket.io-client
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application code
 COPY . .
@@ -30,7 +30,7 @@ RUN mkdir -p /usr/share/nginx/html/templates
 # Copy the template file
 COPY src/templates/gitlab-device-script.py /usr/share/nginx/html/templates/
 
-# Expose port 3000
+# Expose port 3001
 EXPOSE 3001
 
 CMD ["nginx", "-g", "daemon off;"]
