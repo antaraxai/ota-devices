@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Device } from '../types';
-import { FaGithub, FaCodeBranch, FaFolder, FaInfo, FaPencilAlt, FaComments, FaDownload } from 'react-icons/fa';
+import { FaGithub, FaCodeBranch, FaFolder, FaInfo, FaPencilAlt, FaComments, FaDownload, FaTerminal, FaDesktop } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { useDevices } from '../contexts/DeviceContext';
 import { toast } from 'react-toastify';
+import DeviceController from './DeviceController';
+// import DemoView from './DemoView';
 
-type TabType = 'info' | 'edit' | 'chat';
+type TabType = 'info' | 'edit' | 'chat' | 'controller';
 
 interface DeviceDrawerProps {
   device: Device;
@@ -70,6 +72,10 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'controller':
+        return <DeviceController deviceId={device.id} />;
+      // case 'demo':
+      //   return <DemoView deviceId={device.id} />;
       case 'info':
         return (
           <div className="space-y-8">
@@ -402,116 +408,105 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity z-40"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Drawer */}
-      <div
-        className={`fixed right-0 top-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                {editedDevice.title}
-              </h2>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Tabs */}
-            <div className="flex space-x-1">
-              <button
-                onClick={() => setActiveTab('info')}
-                className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'info'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <FaInfo className="mr-2" />
-                Info
-              </button>
-              <button
-                onClick={() => setActiveTab('edit')}
-                className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'edit'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <FaPencilAlt className="mr-2" />
-                Edit
-              </button>
-              <button
-                onClick={() => setActiveTab('chat')}
-                className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'chat'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <FaComments className="mr-2" />
-                Chat
-              </button>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
-              {renderTabContent()}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            {activeTab === 'edit' ? (
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setActiveTab('info')}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Save Changes
-                </button>
-              </div>
-            ) : activeTab === 'info' && (
-              <button
-                className={`w-full py-2.5 px-4 rounded-lg text-white text-sm font-medium transition-colors ${
-                  editedDevice.github_status === 'updating'
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                }`}
-                disabled={editedDevice.github_status === 'updating'}
-              >
-                {editedDevice.github_status === 'updating' ? 'Updating...' : 'Check for Updates'}
-              </button>
-            )}
-          </div>
+    <div
+      className={`fixed inset-y-0 right-0 w-[48rem] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium text-gray-900">Device Details</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500"
+          >
+            <span className="sr-only">Close panel</span>
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
       </div>
-    </>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex -mb-px">
+          <button
+            onClick={() => setActiveTab('info')}
+            className={`${
+              activeTab === 'info'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm items-center justify-center inline-flex`}
+          >
+            <FaInfo className="mr-2" />
+            Info
+          </button>
+          <button
+            onClick={() => setActiveTab('edit')}
+            className={`${
+              activeTab === 'edit'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm items-center justify-center inline-flex`}
+          >
+            <FaPencilAlt className="mr-2" />
+            Edit
+          </button>
+          <button
+            onClick={() => setActiveTab('controller')}
+            className={`${
+              activeTab === 'controller'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex items-center whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+          >
+            <FaDesktop className="mr-2" />
+            Device Control
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`${
+              activeTab === 'chat'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm items-center justify-center inline-flex`}
+          >
+            <FaComments className="mr-2" />
+            Chat
+          </button>
+          {/* <button
+            onClick={() => setActiveTab('demo')}
+            className={`${
+              activeTab === 'demo'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm items-center justify-center inline-flex`}
+          >
+            <FaDesktop className="mr-2" />
+            Demo
+          </button> */}
+        </nav>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-50 h-full w-full bg-white">
+        <div className="flex-1 overflow-y-auto p-6">
+          {renderTabContent()}
+        </div>
+      </div>
+    </div>
   );
 };
 
