@@ -501,7 +501,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       </div>
 
       {/* Content */}
-      <div className="relative z-50 h-full w-full bg-white">
+      <div className="relative z-50 flex flex-col flex-1 bg-white overflow-hidden">
         <div className="flex-1 overflow-y-auto p-6">
           {renderTabContent()}
         </div>

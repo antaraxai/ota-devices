@@ -31,10 +31,10 @@ cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:3001')
 CORS(app, 
      resources={r"/*": {
          "origins": ["*"],  # Allow all origins temporarily for debugging
-         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials", "If-Modified-Since"],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "supports_credentials": True,
-         "expose_headers": ["Content-Range", "X-Content-Range"]
+         "expose_headers": ["Content-Range", "X-Content-Range", "Last-Modified"]
      }},
      supports_credentials=True
 )
@@ -42,15 +42,19 @@ CORS(app,
 # Configure Socket.IO with CORS
 socketio = SocketIO(
     app,
-    cors_allowed_origins=["*"],  # Allow all origins temporarily for debugging
-    async_mode='threading'
+    cors_allowed_origins=["http://localhost:3001"],
+    async_mode='threading',
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60000,
+    ping_interval=25000
 )
 
 def add_cors_headers(response):
     """Add CORS headers to the response."""
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, If-Modified-Since'
     return response
 
 @app.after_request
@@ -376,6 +380,19 @@ def get_device_preview(device_id):
             log_with_timestamp(f"HTML file not found at: {html_path}")
             return jsonify({'error': 'Template not found'}), 404
             
+        # Get last modified time
+        last_modified = os.path.getmtime(html_path)
+            
+        # Check if client has a newer version
+        if_modified_since = request.headers.get('If-Modified-Since')
+        if if_modified_since:
+            try:
+                if_modified_since = float(if_modified_since)
+                if if_modified_since >= last_modified:
+                    return '', 304  # Not Modified
+            except ValueError:
+                pass
+            
         with open(html_path, 'r') as f:
             html_content = f.read()
             
@@ -384,11 +401,33 @@ def get_device_preview(device_id):
         html_content = html_content.replace('href="./style.css"', f'href="{base_url}/style.css"')
         html_content = html_content.replace('src="./script.js"', f'src="{base_url}/script.js"')
         
+        # Add scroll position preservation script
+        scroll_script = """
+        <script>
+            // Store scroll position before unload
+            window.addEventListener('beforeunload', function() {
+                sessionStorage.setItem('scrollPos', window.scrollY);
+            });
+            
+            // Restore scroll position after load
+            window.addEventListener('load', function() {
+                if (sessionStorage.getItem('scrollPos') !== null) {
+                    window.scrollTo(0, parseInt(sessionStorage.getItem('scrollPos')));
+                }
+            });
+        </script>
+        """
+        
+        # Insert script before closing body tag
+        html_content = html_content.replace('</body>', f'{scroll_script}</body>')
+        
         log_with_timestamp(f"Serving HTML with size: {len(html_content)} bytes")
             
         response = make_response(html_content)
         response.headers['Content-Type'] = 'text/html'
         response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Last-Modified'] = str(last_modified)
+        response.headers['Cache-Control'] = 'no-cache'
         return response
         
     except Exception as e:

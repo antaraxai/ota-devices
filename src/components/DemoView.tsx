@@ -14,67 +14,123 @@ const formatDeviceId = (id: string): string => {
 
 const DemoView: React.FC<DemoViewProps> = ({ deviceId }) => {
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [iframeKey, setIframeKey] = useState(0); // Add key to force iframe reload
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const socketRef = React.useRef<any>(null);
+  const lastModifiedRef = React.useRef<string | null>(null);
+  const checkingRef = React.useRef<boolean>(false);
 
-  useEffect(() => {
-    // Reset loading state when device ID changes
-    setIsLoading(true);
-    setError(null);
-    setIframeKey(prev => prev + 1); // Force iframe reload
+  const checkForUpdates = React.useCallback(async (force: boolean = false) => {
+    if (checkingRef.current) return;
+    checkingRef.current = true;
 
-    // Connect to WebSocket
-    const socket = io(config.socketUrl);
+    try {
+      const response = await fetch(
+        `${config.apiBaseUrl}/api/devices/${formatDeviceId(deviceId)}/preview`, 
+        {
+          method: 'HEAD',
+          headers: lastModifiedRef.current && !force ? {
+            'If-Modified-Since': lastModifiedRef.current
+          } : {}
+        }
+      );
 
-    // Listen for device updates
-    socket.on('device_updated', (data: { device_id: string }) => {
-      if (data.device_id === deviceId) {
-        console.log('Device updated, refreshing preview...');
-        setIframeKey(prev => prev + 1); // Force iframe reload
+      if (response.status === 200) {
+        const newLastModified = response.headers.get('Last-Modified');
+        if (force || !lastModifiedRef.current || newLastModified !== lastModifiedRef.current) {
+          lastModifiedRef.current = newLastModified;
+          const iframe = iframeRef.current;
+          
+          if (iframe) {
+            iframe.src = `${config.apiBaseUrl}/api/devices/${formatDeviceId(deviceId)}/preview`;
+            console.log(force ? 'Forced refresh' : 'Content changed, updating...');
+          }
+        } else {
+          console.log('Content unchanged, skipping update');
+        }
       }
-    });
-
-    // Cleanup socket connection
-    return () => {
-      socket.disconnect();
-    };
+    } catch (err) {
+      console.error('Error checking for updates:', err);
+    } finally {
+      checkingRef.current = false;
+    }
   }, [deviceId]);
 
+  useEffect(() => {
+    // Initialize Socket.IO connection
+    if (!socketRef.current) {
+      socketRef.current = io(config.socketUrl, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity
+      });
+    }
+
+    // Listen for device updates
+    const handleDeviceUpdate = (data: { device_id: string }) => {
+      if (data.device_id === deviceId) {
+        console.log('Device update received, forcing refresh...');
+        checkForUpdates(true);  // Force refresh on device update
+      }
+    };
+
+    socketRef.current.on('device_updated', handleDeviceUpdate);
+    socketRef.current.on('connect', () => console.log('Socket connected'));
+    socketRef.current.on('disconnect', () => console.log('Socket disconnected'));
+
+    // Initial check and set up periodic checks every 30 seconds
+    checkForUpdates(true);  // Force initial load
+    const checkInterval = setInterval(() => checkForUpdates(false), 30000);
+
+    // Cleanup
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('device_updated', handleDeviceUpdate);
+      }
+      clearInterval(checkInterval);
+    };
+  }, [deviceId, checkForUpdates]);
+
   const handleIframeLoad = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
-    console.log('Iframe loaded');
-    setIsLoading(false);
+    console.log('Content loaded');
   };
 
   const handleIframeError = () => {
     console.error('Iframe failed to load');
     setError('Failed to load preview');
-    setIsLoading(false);
   };
 
   return (
-    <div className="h-full w-full">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+    <div className="h-full w-full relative flex flex-col">
+      {/* Preview Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="text-sm text-gray-600">Device Preview</div>
+        <div className="flex space-x-2">
+          {error && (
+            <div className="text-sm text-red-500">
+              {error}
+            </div>
+          )}
         </div>
-      )}
-      
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white">
-          <div className="bg-red-50 text-red-500 p-4 rounded-lg max-w-md text-center">
-            {error}
+      </div>
+
+      {/* Preview Container */}
+      <div className="flex-1 relative bg-gray-100">
+        <div className="absolute inset-0 p-4">
+          <div className="w-full h-full bg-white rounded-lg shadow-lg">
+            {/* Static iframe with scrolling enabled */}
+            <iframe
+              ref={iframeRef}
+              src={`${config.apiBaseUrl}/api/devices/${formatDeviceId(deviceId)}/preview`}
+              className="w-full h-full border-0"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+              sandbox="allow-scripts allow-same-origin"
+              style={{ overflow: 'auto' }}
+            />
           </div>
         </div>
-      )}
-
-      <iframe
-        key={iframeKey}
-        src={`${config.apiBaseUrl}/api/devices/${formatDeviceId(deviceId)}/preview`}
-        className="w-full h-full border-0"
-        onLoad={handleIframeLoad}
-        onError={handleIframeError}
-        sandbox="allow-scripts allow-same-origin"
-      />
+      </div>
     </div>
   );
 };
