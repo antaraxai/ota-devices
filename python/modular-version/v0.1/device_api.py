@@ -27,17 +27,36 @@ app = Flask(__name__)
 # Get CORS origin from environment or default to localhost
 cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:3001')
 
-# Configure CORS
-CORS(app, resources={
-    r"/*": {
-        "origins": cors_origin,
-        "allow_headers": ["Content-Type"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }
-})
+# Configure CORS with more permissive settings
+CORS(app, 
+     resources={r"/*": {
+         "origins": ["*"],  # Allow all origins temporarily for debugging
+         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "supports_credentials": True,
+         "expose_headers": ["Content-Range", "X-Content-Range"]
+     }},
+     supports_credentials=True
+)
 
 # Configure Socket.IO with CORS
-socketio = SocketIO(app, cors_allowed_origins=cors_origin)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=["*"],  # Allow all origins temporarily for debugging
+    async_mode='threading'
+)
+
+def add_cors_headers(response):
+    """Add CORS headers to the response."""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses."""
+    return add_cors_headers(response)
 
 def log_with_timestamp(message: str):
     """Print a message with a timestamp."""
