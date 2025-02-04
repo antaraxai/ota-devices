@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { config } from '../config';
 
 interface DemoViewProps {
   deviceId: string;
@@ -23,7 +24,7 @@ const DemoView: React.FC<DemoViewProps> = ({ deviceId }) => {
     setIframeKey(prev => prev + 1); // Force iframe reload
 
     // Connect to WebSocket
-    const socket = io('http://localhost:5001');
+    const socket = io(config.socketUrl);
 
     // Listen for device updates
     socket.on('device_updated', (data: { device_id: string }) => {
@@ -68,7 +69,7 @@ const DemoView: React.FC<DemoViewProps> = ({ deviceId }) => {
 
       <iframe
         key={iframeKey}
-        src={`http://localhost:5001/api/devices/${formatDeviceId(deviceId)}/preview`}
+        src={`${config.apiBaseUrl}/api/devices/${formatDeviceId(deviceId)}/preview`}
         className="w-full h-full border-0"
         onLoad={handleIframeLoad}
         onError={handleIframeError}

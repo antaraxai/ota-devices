@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
+import { config } from '../config';
 import DemoView from './DemoView';
 
 interface DeviceControllerProps {
@@ -25,7 +27,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/status`);
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/status`);
       if (!response.ok) {
         throw new Error('Failed to fetch status');
       }
@@ -40,7 +42,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
 
   const fetchLogs = async () => {
     try {
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/logs`);
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/logs`);
       if (!response.ok) {
         throw new Error('Failed to fetch logs');
       }
@@ -56,7 +58,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/start`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +84,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/stop`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/stop`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
