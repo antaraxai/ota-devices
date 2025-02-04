@@ -23,13 +23,21 @@ supabase_key = os.getenv("VITE_SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
 app = Flask(__name__)
+
+# Get CORS origin from environment or default to localhost
+cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:3001')
+
+# Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": "*",
-        "allow_headers": ["Content-Type"]
+        "origins": cors_origin,
+        "allow_headers": ["Content-Type"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     }
 })
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configure Socket.IO with CORS
+socketio = SocketIO(app, cors_allowed_origins=cors_origin)
 
 def log_with_timestamp(message: str):
     """Print a message with a timestamp."""
