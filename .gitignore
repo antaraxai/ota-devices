@@ -59,7 +59,4 @@ logs/
 dist/
 build/
 *.pyc
-
-# System files
 .DS_Store
-Thumbs.db

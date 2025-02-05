@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
+import { config } from '../config';
 import DemoView from './DemoView';
 
 interface DeviceControllerProps {
@@ -22,10 +24,11 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
   const [logs, setLogs] = useState<DeviceLogs>({ stdout: [], stderr: [] });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'logs' | 'preview'>('logs');
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/status`);
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/status`);
       if (!response.ok) {
         throw new Error('Failed to fetch status');
       }
@@ -40,7 +43,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
 
   const fetchLogs = async () => {
     try {
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/logs`);
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/logs`);
       if (!response.ok) {
         throw new Error('Failed to fetch logs');
       }
@@ -56,7 +59,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/start`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +85,7 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:5001/api/devices/${deviceId}/stop`, {
+      const response = await fetch(`${config.apiBaseUrl}/api/devices/${deviceId}/stop`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,64 +147,95 @@ const DeviceController: React.FC<DeviceControllerProps> = ({ deviceId }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isControllerRunning ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm font-medium">Device Status:</span>
-            <span className={`text-sm ${isControllerRunning ? 'text-green-600' : 'text-red-600'}`}>
-              {isControllerRunning ? 'Running' : 'Stopped'}
-            </span>
+      {/* Fixed Header */}
+      <div className="flex-none p-4 bg-white border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isControllerRunning ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm font-medium">Device Status:</span>
+              <span className={`text-sm ${isControllerRunning ? 'text-green-600' : 'text-red-600'}`}>
+                {isControllerRunning ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+            {status.pid && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">PID: {status.pid}</span>
+            )}
           </div>
-          {status.pid && (
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">PID: {status.pid}</span>
-          )}
+          <div className="flex gap-2">
+            <button
+              className={`px-4 py-2 text-sm font-medium text-white rounded disabled:opacity-50 ${
+                isControllerRunning 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+              onClick={isControllerRunning ? stopController : startController}
+              disabled={isLoading}
+            >
+              {isLoading 
+                ? (isControllerRunning ? 'Stopping...' : 'Starting...') 
+                : (isControllerRunning ? 'Stop Device' : 'Start Device')}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            className={`px-4 py-2 text-sm font-medium text-white rounded disabled:opacity-50 ${
-              isControllerRunning 
-                ? 'bg-red-600 hover:bg-red-700' 
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
-            onClick={isControllerRunning ? stopController : startController}
-            disabled={isLoading}
-          >
-            {isLoading 
-              ? (isControllerRunning ? 'Stopping...' : 'Starting...') 
-              : (isControllerRunning ? 'Stop Device' : 'Start Device')}
-          </button>
-        </div>
+
+        {error && (
+          <div className="mt-4 bg-red-50 text-red-500 p-2 rounded text-sm">
+            {error}
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="bg-red-50 text-red-500 p-2 rounded text-sm mb-4">
-          {error}
+      {/* Tabs */}
+      <div className="flex-1 overflow-hidden">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'logs'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Device Logs
+            </button>
+            <button
+              onClick={() => setActiveTab('preview')}
+              className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'preview'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Device Preview
+            </button>
+          </nav>
         </div>
-      )}
 
-      <div className="space-y-4 flex-1 overflow-auto">
-        {/* Controller Logs */}
-        <div>
-          <h3 className="text-sm font-medium mb-2">Device Logs</h3>
-          <div className="bg-black rounded-md p-4 font-mono text-xs text-green-400 overflow-auto h-[150px]">
-            {logs.stdout.map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
-            {logs.stderr.map((line, i) => (
-              <div key={`err-${i}`} className="text-red-400">
-                {line}
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'logs' ? (
+            <div className="p-4 space-y-4">
+              <div className="bg-white rounded-lg shadow-sm">
+                <h3 className="text-sm font-medium p-3 border-b border-gray-200">Device Logs</h3>
+                <div className="bg-black rounded-b-lg p-4 font-mono text-xs text-green-400 overflow-auto h-[500px]">
+                  {logs.stdout.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                  {logs.stderr.map((line, i) => (
+                    <div key={`err-${i}`} className="text-red-400">
+                      {line}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Live Preview */}
-        <div className="flex-1">
-          <h3 className="text-sm font-medium mb-2">Device Preview</h3>
-          <div className="bg-white rounded-md border border-gray-200 h-[500px] overflow-auto">
-            <DemoView deviceId={deviceId} />
-          </div>
+            </div>
+          ) : (
+            <div className="h-[calc(100vh-200px)]">
+              <DemoView deviceId={deviceId} />
+            </div>
+          )}
         </div>
       </div>
     </div>

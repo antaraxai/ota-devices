@@ -107,6 +107,9 @@ class GitLabController:
             )
             auth_repo_url = urlunparse(auth_url)
 
+            # Set git config globally
+            subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
+
             # Clone the repository
             if os.path.exists(workspace_path):
                 self.logger.log("Removing existing workspace")
@@ -115,7 +118,9 @@ class GitLabController:
             os.makedirs(workspace_path)
             self.logger.log("Created fresh workspace")
 
-            clone_cmd = ['git', 'clone', auth_repo_url, workspace_path]
+            # Clone with branch specified
+            branch = self.connection_manager.device_config.get('repo_branch', 'main')
+            clone_cmd = ['git', 'clone', '-b', branch, auth_repo_url, workspace_path]
             result = subprocess.run(clone_cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
