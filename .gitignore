@@ -49,9 +49,23 @@ ENV/
 .env.production
 
 # Project specific
+
+# Version checker files
+gitlab_versions.json
+python/modular-version/*/backups/
+python/modular-version/*/device_backups/
+*.bak
+
+# Project specific
 .last_commit
 shared_repo/
+shared_repos/
 device_workspaces/
+old-device-api.py
+
+# Modular version specific
+python/modular-version/*/shared_repos/
+python/modular-version/*/device_workspaces/
 logs/
 *.log
 
