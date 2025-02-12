@@ -1,48 +1,121 @@
-from flask import Flask, jsonify, request, make_response
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit
-import os
-import json
-import asyncio
-import threading
-import time
-import re
-import subprocess
-import shutil
-from datetime import datetime
-from supabase import create_client, Client
-from dotenv import load_dotenv
-from urllib.parse import urlparse, urlunparse
+"""Production-grade device API with GitLab integration."""
 
-# Load environment variables
-load_dotenv()
+from flask import Flask, jsonify, request, send_file
+from flask_cors import CORS
+from flask_socketio import SocketIO
+from supabase import create_client
+from os import environ
+import traceback
+from datetime import datetime
+from typing import Dict, Any, Optional
+import tempfile
+import zipfile
+import os
+import shutil
+import re
+import json
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+print(f'Looking for .env file at: {env_path}')
+load_dotenv(env_path)
+
+# Debug: Print environment variables
+print('Environment variables:')
+print(f'VITE_SUPABASE_URL exists: {"VITE_SUPABASE_URL" in environ}')
+print(f'VITE_SUPABASE_SERVICE_ROLE_KEY exists: {"VITE_SUPABASE_SERVICE_ROLE_KEY" in environ}')
 
 # Initialize Supabase client
-supabase_url = os.getenv("VITE_SUPABASE_URL")
-supabase_key = os.getenv("VITE_SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase = None
+if 'VITE_SUPABASE_URL' in environ and 'VITE_SUPABASE_SERVICE_ROLE_KEY' in environ:
+    supabase = create_client(
+        environ['VITE_SUPABASE_URL'],
+        environ['VITE_SUPABASE_SERVICE_ROLE_KEY']
+    )
+    print('Successfully initialized Supabase client')
+else:
+    print('Warning: VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_ROLE_KEY environment variables are required')
+
+def is_valid_device_id(device_id: str) -> bool:
+    """Validate device ID format (UUID)."""
+    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    return bool(re.match(uuid_pattern, device_id.lower()))
+
+def get_device_config(device_id: str) -> Optional[Dict[str, Any]]:
+    """Get device configuration.
+    If Supabase is available, fetch from database, otherwise return default config."""
+    try:
+        if supabase:
+            response = supabase.table('devices').select('*').eq('id', device_id).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+        
+        # Return default config if no Supabase or device not found
+        return {
+            'id': device_id,
+            'check_interval': 60,
+            'auto_update': True
+        }
+    except Exception as e:
+        StructuredLogger.error('Error fetching device config',
+            extra={
+                'device_id': device_id,
+                'error': str(e)
+            }
+        )
+        # Return default config on error
+        return {
+            'id': device_id,
+            'check_interval': 60,
+            'auto_update': True
+        }
+import threading
+import asyncio
+from typing import Any, Dict
+from datetime import datetime
+
+# Import production-grade utilities
+from utils import StructuredLogger
+from utils.retry_utils import RetryUtils
+from utils.logging_utils import log_duration
+from utils.security_utils import SecurityUtils
+from utils.device_manager import (
+    update_device_status, list_devices, start_device,
+    stop_device, get_device_status, mark_all_devices_offline
+)
+from utils.preview_handler import get_device_preview, get_device_static
+from utils.device_logs import get_device_logs
+from utils.git_utils import monitor_gitlab_changes
+from utils.workspace_utils import force_refresh, create_directory_if_not_exists, get_device_work_dir
 
 app = Flask(__name__)
 
-# Get CORS origin from environment or default to localhost
-cors_origin = os.getenv('CORS_ORIGIN', 'http://localhost:3001')
+# Get CORS origin from environment
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3001').split(',')
+StructuredLogger.info('Configured CORS origins', extra={'origins': cors_origins})
 
-# Configure CORS with more permissive settings
+# Configure CORS with secure settings
 CORS(app, 
      resources={r"/*": {
-         "origins": ["*"],  # Allow all origins temporarily for debugging
-         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials", "If-Modified-Since"],
+         "origins": cors_origins,
+         "allow_headers": [
+             "Content-Type",
+             "Authorization",
+             "Access-Control-Allow-Credentials",
+             "If-Modified-Since"
+         ],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "supports_credentials": True,
-         "expose_headers": ["Content-Range", "X-Content-Range", "Last-Modified"]
-     }},
-     supports_credentials=True
+         "expose_headers": ["Content-Range", "X-Content-Range", "Last-Modified"],
+         "max_age": 3600
+     }}
 )
 
-# Configure Socket.IO with CORS
+# Initialize SocketIO with production settings
 socketio = SocketIO(
     app,
-    cors_allowed_origins=["http://localhost:3001"],
+    cors_allowed_origins=cors_origins,
     async_mode='threading',
     logger=True,
     engineio_logger=True,
@@ -50,24 +123,267 @@ socketio = SocketIO(
     ping_interval=25000
 )
 
-def add_cors_headers(response):
-    """Add CORS headers to the response."""
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, If-Modified-Since'
-    return response
+# API Routes
+@app.route('/api/devices', methods=['GET'])
+def get_devices():
+    """Get all devices and their status."""
+    return jsonify(list_devices())
+
+@app.route('/api/devices/<device_id>/start', methods=['POST'])
+def handle_start_device(device_id):
+    """Start monitoring a specific device."""
+    return jsonify(start_device(device_id))
+
+@app.route('/api/devices/<device_id>/stop', methods=['POST'])
+def handle_stop_device(device_id):
+    """Stop monitoring a specific device."""
+    return jsonify(stop_device(device_id))
+
+@app.route('/api/devices/<device_id>/status', methods=['GET'])
+def handle_device_status(device_id):
+    """Get detailed status of a specific device."""
+    return jsonify(get_device_status(device_id))
+
+@app.route('/api/devices/<device_id>/preview', methods=['GET'])
+def handle_device_preview(device_id):
+    """Get the device's index.html preview."""
+    return get_device_preview(device_id)
+
+@app.route('/api/devices/<device_id>/static/<path:filename>', methods=['GET'])
+def handle_device_static(device_id, filename):
+    """Serve static files (CSS, JS) for device preview."""
+    return get_device_static(device_id, filename)
+
+@app.route('/api/devices/<device_id>/refresh', methods=['POST'])
+def handle_force_refresh(device_id):
+    """Force refresh of device files from GitLab."""
+    return jsonify(force_refresh(device_id))
+
+@app.route('/api/devices/<device_id>/logs', methods=['GET'])
+def handle_device_logs(device_id):
+    """Get logs for a specific device."""
+    return jsonify(get_device_logs(device_id))
+
+@app.route('/api/devices/<device_id>/download-script', methods=['GET'])
+def handle_download_script(device_id):
+    """Download the device script with configuration and dependencies."""
+    try:
+        # Validate device ID
+        if not is_valid_device_id(device_id):
+            return jsonify({'error': 'Invalid device ID format'}), 400
+            
+        # Check if device exists
+        device = get_device_config(device_id)
+        if not device:
+            return jsonify({'error': 'Device not found'}), 404
+
+        # Get the device's work directory
+        device_dir = get_device_work_dir(device_id)
+        os.makedirs(device_dir, exist_ok=True)
+        
+        # Define required files with metadata
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        python_dir = os.path.dirname(os.path.dirname(os.path.dirname(base_dir)))
+        required_files = [
+            {
+                'filename': 'gitlab_controller.py',
+                'path': os.path.join(base_dir, 'gitlab_controller.py'),
+                'required': True,
+                'description': 'Main controller script'
+            },
+            {
+                'filename': 'gitlab_ota_manager.py',
+                'path': os.path.join(base_dir, 'gitlab_ota_manager.py'),
+                'required': True,
+                'description': 'OTA update manager'
+            },
+            {
+                'filename': 'gitlab_file_manager.py',
+                'path': os.path.join(base_dir, 'gitlab_file_manager.py'),
+                'required': True,
+                'description': 'File operations manager'
+            },
+            {
+                'filename': 'gitlab_connection_manager.py',
+                'path': os.path.join(base_dir, 'gitlab_connection_manager.py'),
+                'required': True,
+                'description': 'Supabase connection manager'
+            },
+            {
+                'filename': 'gitlab_file_monitor.py',
+                'path': os.path.join(base_dir, 'gitlab_file_monitor.py'),  # Look in the current directory
+                'required': True,
+                'description': 'File change monitor'
+            },
+            {
+                'filename': 'gitlab_version_checker.py',
+                'path': os.path.join(base_dir, 'gitlab_version_checker.py'),
+                'required': True,
+                'description': 'Version check utility'
+            },
+            {
+                'filename': 'current_logger.py',
+                'path': os.path.join(base_dir, 'current_logger.py'),
+                'required': True,
+                'description': 'Logging utility'
+            }
+        ]
+        
+        # First, copy gitlab_file_monitor.py to the current directory if it doesn't exist
+        monitor_file = next(f for f in required_files if f['filename'] == 'gitlab_file_monitor.py')
+        local_monitor_path = os.path.join(base_dir, monitor_file['filename'])
+        if not os.path.exists(local_monitor_path):
+            shutil.copy2(monitor_file['path'], local_monitor_path)
+            monitor_file['path'] = local_monitor_path  # Update the path to use local copy
+        
+        # Verify all required files exist
+        missing_files = []
+        for file_info in required_files:
+            if file_info['required'] and not os.path.exists(file_info['path']):
+                missing_files.append(file_info['filename'])
+        
+        if missing_files:
+            error_msg = f"Missing required files: {', '.join(missing_files)}"
+            StructuredLogger.error('Missing required files for download',
+                extra={
+                    'device_id': device_id,
+                    'missing_files': missing_files
+                }
+            )
+            return jsonify({'error': error_msg}), 500
+
+        # Create a requirements.txt file
+        requirements_path = os.path.join(device_dir, 'requirements.txt')
+        with open(requirements_path, 'w') as f:
+            f.write('# Python dependencies for device script\n')
+            f.write('requests>=2.25.1\n')
+            f.write('python-dotenv>=0.19.0\n')
+            f.write('supabase>=0.7.1\n')
+            f.write('GitPython>=3.1.30\n')
+
+        # Create device config file
+        config = {
+            'device_id': device_id,
+            'api_url': request.host_url.rstrip('/'),
+            'check_interval': device.get('check_interval', 60),
+            'auto_update': device.get('auto_update', True)
+        }
+        config_path = os.path.join(device_dir, 'device_config.json')
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
+
+        # Create a temporary zip file with cleanup
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+            try:
+                with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    # Add all Python files
+                    for file_info in required_files:
+                        if os.path.exists(file_info['path']):
+                            zf.write(file_info['path'], file_info['filename'])
+                            StructuredLogger.info('Added file to zip',
+                                extra={
+                                    'file': file_info['filename'],
+                                    'description': file_info['description']
+                                }
+                            )
+                    
+                    # Add requirements.txt and config
+                    zf.write(requirements_path, 'requirements.txt')
+                    zf.write(config_path, 'device_config.json')
+                    
+                    # Add README with instructions
+                    readme_content = f"""# Device Script Package
+
+This package contains the following components:
+
+## Python Scripts
+{chr(10).join(f'- {f["filename"]}: {f["description"]}' for f in required_files)}
+
+## Configuration
+- device_config.json: Device-specific configuration
+- requirements.txt: Python package dependencies
+
+## Setup Instructions
+1. Install dependencies: pip install -r requirements.txt
+2. Ensure all files are in the same directory
+3. Run: python gitlab_controller.py
+"""
+                    zf.writestr('README.md', readme_content)
+
+                # Log the successful download
+                StructuredLogger.info('Device scripts package created',
+                    extra={
+                        'device_id': device_id,
+                        'timestamp': datetime.now().isoformat(),
+                        'file_count': len(required_files) + 3  # +3 for requirements.txt, config.json, and README.md
+                    }
+                )
+                
+                # Send the zip file
+                return send_file(
+                    temp_zip.name,
+                    as_attachment=True,
+                    download_name=f'device-scripts-{device_id}.zip',
+                    mimetype='application/zip'
+                )
+            finally:
+                # Clean up temporary files
+                try:
+                    os.unlink(requirements_path)
+                    os.unlink(config_path)
+                except Exception as e:
+                    StructuredLogger.warning('Error cleaning up temporary files',
+                        extra={'error': str(e)}
+                    )
+        
+    except Exception as e:
+        StructuredLogger.error('Error creating device script package',
+            extra={
+                'device_id': device_id,
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }
+        )
+        return jsonify({
+            'error': 'Failed to create device script package',
+            'details': str(e)
+        }), 500
+        
+    except Exception as e:
+        StructuredLogger.error(
+            'Error downloading device script',
+            extra={'device_id': device_id, 'error': str(e)}
+        )
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    # Mark all devices as offline on startup
+    mark_all_devices_offline()
+    
+    # Start GitLab monitoring thread
+    monitor_thread = threading.Thread(target=monitor_gitlab_changes, daemon=True)
+    monitor_thread.start()
+    StructuredLogger.info("Started GitLab monitoring thread")
+    
+    # Start Flask server
+    socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+
+# Create necessary directories
+base_dir = os.path.dirname(os.path.abspath(__file__))
+create_directory_if_not_exists(os.path.join(base_dir, 'workspaces'))
+create_directory_if_not_exists(os.path.join(base_dir, 'backups'))
+create_directory_if_not_exists(os.path.join(base_dir, 'shared_repos'))
 
 @app.after_request
 def after_request(response):
     """Add CORS headers to all responses."""
-    return add_cors_headers(response)
+    for origin in cors_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, If-Modified-Since'
+    return response
 
-def log_with_timestamp(message: str):
-    """Print a message with a timestamp."""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {message}")
-
-def run_async(coroutine):
+def run_async(coroutine) -> Any:
     """Run an async function in a synchronous context."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -78,149 +394,357 @@ def run_async(coroutine):
 
 def format_device_id(device_id: str) -> str:
     """Format device ID for workspace path."""
-    return re.sub(r'[^a-z0-9-]', '', device_id.lower())
+    return SecurityUtils.validate_input(
+        device_id.lower(),
+        pattern_name='device_id'
+    )
 
-async def get_devices_with_github():
+@RetryUtils.with_retries(max_attempts=3)
+async def get_devices_with_github() -> Dict[str, Any]:
     """Fetch all devices that have GitHub configuration."""
     try:
         response = supabase.table('devices').select('*').not_.is_('repo_url', 'null').execute()
         devices = {device['id']: device for device in response.data}
-        log_with_timestamp(f"[POLL] Found {len(devices)} devices with GitHub configuration")
+        StructuredLogger.info(
+            'Found devices with GitHub configuration',
+            extra={
+                'count': len(devices),
+                'device_ids': list(devices.keys())
+            }
+        )
         return devices
     except Exception as e:
-        log_with_timestamp(f"[ERROR] Error fetching devices: {str(e)}")
+        StructuredLogger.error(
+            'Failed to fetch devices',
+            error=e
+        )
         return {}
 
 def get_shared_repo_dir() -> str:
     """Get the shared repository directory."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(current_dir, 'shared_repo')
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(app_dir, 'shared_repo')
 
 def get_device_work_dir(device_id: str) -> str:
     """Get the working directory for a device."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    work_dir = os.path.join(current_dir, 'device_workspaces', device_id)
-    return work_dir
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(app_dir, 'device_workspaces', device_id)
 
-def setup_device_workspace(device_id: str, device: dict) -> str:
+@log_duration
+def setup_device_workspace(device_id: str, device: Dict[str, Any]) -> str:
     """Set up a clean workspace for the device."""
+    # Validate inputs
+    device_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
     work_dir = get_device_work_dir(device_id)
     
-    # Remove existing workspace if it exists
-    if os.path.exists(work_dir):
-        log_with_timestamp(f"[INFO] Removing existing workspace for device {device_id}")
-        shutil.rmtree(work_dir)
-    
-    # Create workspace and templates directory
-    templates_dir = os.path.join(work_dir, 'src', 'templates')
-    os.makedirs(templates_dir, exist_ok=True)
-    log_with_timestamp(f"[INFO] Created fresh workspace for device {device_id}")
-    
-    return work_dir
+    try:
+        with AtomicUtils.atomic_operation(f'setup_workspace_{device_id}') as temp_dir:
+            # Remove existing workspace if it exists
+            if os.path.exists(work_dir):
+                StructuredLogger.info(
+                    'Removing existing workspace',
+                    extra={'device_id': device_id}
+                )
+                shutil.rmtree(work_dir)
+            
+            # Create workspace and templates directory with secure permissions
+            templates_dir = os.path.join(work_dir, 'src', 'templates')
+            SecurityUtils.secure_directory(templates_dir)
+            
+            StructuredLogger.info(
+                'Created fresh workspace',
+                extra={
+                    'device_id': device_id,
+                    'work_dir': work_dir
+                }
+            )
+            
+            return work_dir
+            
+    except Exception as e:
+        StructuredLogger.error(
+            'Failed to setup workspace',
+            extra={'device_id': device_id},
+            error=e
+        )
+        raise
 
+@RetryUtils.with_retries(max_attempts=3)
+def get_current_commit_sha(repo_dir: str, branch: str = 'main') -> str:
+    """Get the current commit SHA for a repository."""
+    try:
+        # Validate inputs
+        repo_dir = SecurityUtils.validate_input(repo_dir, pattern_name='path')
+        branch = SecurityUtils.validate_input(branch, pattern_name='branch')
+        
+        result = subprocess.run(
+            ['git', 'rev-parse', f'origin/{branch}'],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        commit_sha = result.stdout.strip()
+        if not re.match(SecurityUtils.PATTERNS['sha'], commit_sha):
+            raise ValueError(f'Invalid commit SHA format: {commit_sha}')
+            
+        StructuredLogger.info(
+            'Got commit SHA',
+            extra={
+                'repo_dir': repo_dir,
+                'branch': branch,
+                'commit_sha': commit_sha
+            }
+        )
+        return commit_sha
+        
+    except Exception as e:
+        StructuredLogger.error(
+            'Failed to get commit SHA',
+            extra={
+                'repo_dir': repo_dir,
+                'branch': branch
+            },
+            error=e
+        )
+        return ''
+
+@log_duration
+def backup_workspace(device_id: str) -> bool:
+    """Create a backup of the device workspace with improved error handling and permissions management."""
+    try:
+        # Validate input
+        device_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
+        work_dir = get_device_work_dir(device_id)
+        
+        # Check source directory
+        if not os.path.exists(work_dir):
+            StructuredLogger.info(
+                'No workspace to backup',
+                extra={'device_id': device_id}
+            )
+            return True
+            
+        if not os.access(work_dir, os.R_OK):
+            StructuredLogger.error(
+                'No read permission for workspace',
+                extra={'device_id': device_id, 'work_dir': work_dir}
+            )
+            return False
+        
+        # Setup backup directory
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        backups_dir = os.path.join(app_dir, 'device_backups', device_id)
+        
+        # Ensure backup directory exists with correct permissions
+        os.makedirs(backups_dir, mode=0o750, exist_ok=True)
+        
+        # Use atomic operation for safe backup
+        with AtomicUtils.atomic_operation(f'backup_{device_id}') as temp_dir:
+            try:
+                # Create timestamped backup
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_path = os.path.join(backups_dir, f'backup_{timestamp}')
+                
+                # Copy files with progress tracking
+                total_files = sum(len(files) for _, _, files in os.walk(work_dir))
+                copied_files = 0
+                
+                def copy_with_progress(src, dst, *, follow_symlinks=True):
+                    nonlocal copied_files
+                    copied_files += 1
+                    shutil.copy2(src, dst, follow_symlinks=follow_symlinks)
+                    logger.debug(f'Backup progress: {copied_files}/{total_files} files')
+                
+                # Perform the backup with custom copy function
+                shutil.copytree(
+                    work_dir,
+                    backup_path,
+                    copy_function=copy_with_progress,
+                    dirs_exist_ok=True
+                )
+                
+                logger.info(f'Successfully created backup at {backup_path}')
+                return True
+            except Exception as e:
+                logger.error(f'Failed to create backup for device {device_id}: {str(e)}')
+                return False
+            
+    except Exception as e:
+        StructuredLogger.error(
+            'Failed to create backup',
+            extra={'device_id': device_id},
+            error=e
+        )
+        return False
+
+@RetryUtils.with_retries(max_attempts=3)
+@log_duration
 def clone_or_pull_repo(device_id: str, repo_url: str, branch: str = 'main') -> bool:
     """Clone or pull repository for a device and copy files."""
     try:
+        # Validate inputs
+        device_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
+        repo_url = SecurityUtils.validate_input(repo_url, pattern_name='repo_url')
+        branch = SecurityUtils.validate_input(branch, pattern_name='branch')
+        
         shared_repo = get_shared_repo_dir()
         git_dir = os.path.join(shared_repo, '.git')
         work_dir = get_device_work_dir(device_id)
         
-        # Add GitLab credentials to URL
+        # Get GitLab credentials
         gitlab_username = os.getenv('GITLAB_USERNAME')
         gitlab_token = os.getenv('GITLAB_TOKEN')
         
         if not gitlab_username or not gitlab_token:
-            log_with_timestamp("[ERROR] GitLab credentials not found in environment")
-            return False
-
-        # Parse and add credentials to URL
+            raise EnvironmentError('GitLab credentials not found in environment')
+        
+        # Add credentials to URL
         parsed = urlparse(repo_url)
         auth_url = parsed._replace(
             netloc=f"{gitlab_username}:{gitlab_token}@{parsed.netloc}"
         )
         auth_repo_url = urlunparse(auth_url)
-        log_with_timestamp(f"[INFO] Created authenticated URL for {device_id}")
         
         changes_detected = False
         
-        # First, handle the shared repository
-        if os.path.exists(git_dir):
-            # Repository exists, force pull updates
-            log_with_timestamp(f"[INFO] Pulling updates for shared repo")
-            
-            # Set git config for auth
-            subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
-            
-            # Fetch and reset hard to origin
-            subprocess.run(['git', 'fetch', 'origin'], cwd=shared_repo, capture_output=True)
-            result = subprocess.run(
-                ['git', 'reset', '--hard', f'origin/{branch}'],
-                cwd=shared_repo,
-                capture_output=True,
-                text=True
-            )
-            
-            if result.returncode == 0:
-                changes_detected = True
-                log_with_timestamp("[SUCCESS] Changes pulled successfully")
-            else:
-                log_with_timestamp(f"[ERROR] Error pulling changes: {result.stderr}")
-                return False
-        else:
-            # Repository doesn't exist, clone it
-            log_with_timestamp(f"[INFO] Cloning repository to shared location")
-            # Clear directory if it exists
-            if os.path.exists(shared_repo):
-                shutil.rmtree(shared_repo)
-            
-            # Set git config globally
-            subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
-            
-            # Clone without force flag
-            result = subprocess.run(
-                ['git', 'clone', '-b', branch, auth_repo_url, shared_repo],
-                capture_output=True,
-                text=True
-            )
-            
-            if result.returncode == 0:
-                log_with_timestamp("[SUCCESS] Repository cloned successfully")
-                changes_detected = True
-            else:
-                log_with_timestamp(f"[ERROR] Error cloning repository: {result.stderr}")
-                return False
+        # Use file lock for git operations
+        lock_file = os.path.join(shared_repo, '.git', 'cascade.lock')
         
-        # Copy files to device workspace
-        src_templates = os.path.join(shared_repo, 'src', 'templates')
-        dst_templates = os.path.join(work_dir, 'src', 'templates')
+        with AtomicUtils.file_lock(lock_file, f'git_{device_id}'):
+            if os.path.exists(git_dir):
+                # Update existing repository
+                StructuredLogger.info(
+                    'Updating existing repository',
+                    extra={
+                        'device_id': device_id,
+                        'branch': branch
+                    }
+                )
+                
+                # Configure git
+                subprocess.run(
+                    ['git', 'config', 'credential.helper', 'store'],
+                    cwd=shared_repo,
+                    check=True
+                )
+                
+                # Fetch and reset to origin
+                subprocess.run(
+                    ['git', 'fetch', 'origin'],
+                    cwd=shared_repo,
+                    check=True
+                )
+                
+                subprocess.run(
+                    ['git', 'reset', '--hard', f'origin/{branch}'],
+                    cwd=shared_repo,
+                    check=True
+                )
+                
+                changes_detected = True
+                
+            else:
+                # Clone new repository
+                StructuredLogger.info(
+                    'Cloning new repository',
+                    extra={
+                        'device_id': device_id,
+                        'branch': branch
+                    }
+                )
+                
+                # Clear directory if it exists
+                if os.path.exists(shared_repo):
+                    shutil.rmtree(shared_repo)
+                
+                # Clone repository
+                subprocess.run(
+                    ['git', 'clone', '-b', branch, auth_repo_url, shared_repo],
+                    check=True
+                )
+                
+                changes_detected = True
+            
+            # Update commit information
+            commit_sha = get_current_commit_sha(shared_repo, branch)
+            if commit_sha:
+                supabase.table('devices').update(
+                    {'last_commit_sha': commit_sha}
+                ).eq('id', device_id).execute()
+                
+                StructuredLogger.info(
+                    'Updated commit information',
+                    extra={
+                        'device_id': device_id,
+                        'commit_sha': commit_sha
+                    }
+                )
         
-        if os.path.exists(src_templates):
-            # Create destination directory if it doesn't exist
-            os.makedirs(dst_templates, exist_ok=True)
+        # Handle workspace files
+        if changes_detected:
+            # Create backup
+            if not backup_workspace(device_id):
+                StructuredLogger.warning(
+                    'Failed to create backup',
+                    extra={'device_id': device_id}
+                )
             
-            # Remove old files
-            for item in os.listdir(dst_templates):
-                item_path = os.path.join(dst_templates, item)
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-            
-            # Copy new files
-            for item in os.listdir(src_templates):
-                src_path = os.path.join(src_templates, item)
-                dst_path = os.path.join(dst_templates, item)
-                if os.path.isfile(src_path):
-                    shutil.copy2(src_path, dst_path)
-                    log_with_timestamp(f"Copied {item} to device workspace")
-                    changes_detected = True
+            # Copy templates
+            with AtomicUtils.atomic_operation(f'copy_templates_{device_id}') as temp_dir:
+                src_templates = os.path.join(shared_repo, 'src', 'templates')
+                dst_templates = os.path.join(work_dir, 'src', 'templates')
+                
+                if os.path.exists(src_templates):
+                    # Secure the templates directory
+                    SecurityUtils.secure_directory(dst_templates)
+                    
+                    # Copy files atomically
+                    temp_templates = os.path.join(temp_dir, 'templates')
+                    shutil.copytree(src_templates, temp_templates)
+                    
+                    if os.path.exists(dst_templates):
+                        shutil.rmtree(dst_templates)
+                    shutil.move(temp_templates, dst_templates)
+                    
+                    StructuredLogger.info(
+                        'Copied template files',
+                        extra={
+                            'device_id': device_id,
+                            'template_count': len(os.listdir(src_templates))
+                        }
+                    )
         
         return changes_detected
-                
+        
     except Exception as e:
-        log_with_timestamp(f"Error in clone_or_pull_repo: {str(e)}")
+        StructuredLogger.error(
+            'Failed to update repository',
+            extra={
+                'device_id': device_id,
+                'repo_url': repo_url,
+                'branch': branch
+            },
+            error=e
+        )
         return False
 
 # Store running controllers
 running_controllers = {}
+
+# Initialize Supabase client if credentials are available
+supabase_url = environ.get('SUPABASE_URL')
+supabase_key = environ.get('SUPABASE_KEY')
+supabase = None
+if supabase_url and supabase_key:
+    try:
+        supabase = create_client(supabase_url, supabase_key)
+    except Exception as e:
+        StructuredLogger.warning(
+            'Failed to initialize Supabase client',
+            error=e
+        )
 
 # Store device logs
 device_logs = {}
@@ -236,16 +760,63 @@ def add_device_log(device_id: str, message: str):
     # Keep only last 100 logs
     device_logs[device_id] = device_logs[device_id][-100:]
 
-def update_device_status(device_id: str, status: str, details: str = None):
+@RetryUtils.with_retries(max_attempts=3)
+@log_duration
+def update_device_status(device_id: str, status: str, details: str = None) -> None:
     """Update device status in the database."""
     try:
-        update_data = {'status': status}
-        supabase.table('devices').update(update_data).eq('id', device_id).execute()
-        log_with_timestamp(f"Updated device {device_id} status to {status}")
+        # Validate inputs
+        device_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
+        status = SecurityUtils.validate_input(
+            status,
+            pattern=r'^(ONLINE|OFFLINE|ERROR|UPDATING|SCRIPT_DOWNLOADED)$'
+        )
+        if details:
+            details = SecurityUtils.validate_input(
+                details,
+                max_length=500  # Reasonable limit for status messages
+            )
+        
         # Add status change to device logs
-        add_device_log(device_id, f"Status changed to {status}" + (f": {details}" if details else ""))
+        log_message = f"Status changed to {status}" + (f": {details}" if details else "")
+        add_device_log(device_id, log_message)
+        
+        # Update Supabase if available
+        if supabase:
+            try:
+                update_data = {'status': status}
+                supabase.table('devices').update(update_data).eq('id', device_id).execute()
+            except Exception as e:
+                StructuredLogger.warning(
+                    'Failed to update device status in Supabase',
+                    extra={
+                        'device_id': device_id,
+                        'status': status,
+                        'details': details
+                    },
+                    error=e
+                )
+        
+        StructuredLogger.info(
+            'Updated device status',
+            extra={
+                'device_id': device_id,
+                'status': status,
+                'details': details
+            }
+        )
+        
     except Exception as e:
-        log_with_timestamp(f"Error updating device status: {str(e)}")
+        StructuredLogger.error(
+            'Failed to update device status',
+            extra={
+                'device_id': device_id,
+                'status': status,
+                'details': details
+            },
+            error=e
+        )
+        raise
 
 @app.route('/api/devices', methods=['GET'])
 def list_devices():
@@ -347,17 +918,26 @@ def get_device_status(device_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/devices/<device_id>/preview', methods=['GET'])
+@log_duration
 def get_device_preview(device_id):
     """Get the device's index.html preview."""
     try:
         # Format the device ID
-        formatted_id = format_device_id(device_id)
-        log_with_timestamp(f"Getting preview for device: {formatted_id}")
+        formatted_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
+        formatted_id = format_device_id(formatted_id)
+        
+        StructuredLogger.info(
+            'Getting device preview',
+            extra={'device_id': formatted_id}
+        )
         
         # Check if device exists
         devices = run_async(get_devices_with_github())
         if device_id not in devices:
-            log_with_timestamp(f"Device {formatted_id} not found")
+            StructuredLogger.warning(
+                'Device not found',
+                extra={'device_id': formatted_id}
+            )
             return jsonify({'error': 'Device not found'}), 404
             
         # Get the device's workspace path
@@ -365,19 +945,36 @@ def get_device_preview(device_id):
         workspace_dir = os.path.join(current_dir, 'device_workspaces', formatted_id)
         template_dir = os.path.join(workspace_dir, 'src', 'templates')
         
-        log_with_timestamp(f"Looking for templates in: {template_dir}")
+        StructuredLogger.debug(
+            'Looking for templates',
+            extra={
+                'device_id': formatted_id,
+                'template_dir': template_dir
+            }
+        )
         
         # If workspace doesn't exist, use default template
         if not os.path.exists(template_dir):
             template_dir = os.path.join(current_dir, 'src', 'templates')
-            log_with_timestamp(f"Workspace not found, using default template: {template_dir}")
+            StructuredLogger.info(
+                'Using default template',
+                extra={
+                    'device_id': formatted_id,
+                    'template_dir': template_dir
+                }
+            )
             
         # Read HTML content
         html_path = os.path.join(template_dir, 'index.html')
-        log_with_timestamp(f"Reading HTML from: {html_path}")
         
         if not os.path.exists(html_path):
-            log_with_timestamp(f"HTML file not found at: {html_path}")
+            StructuredLogger.warning(
+                'Template not found',
+                extra={
+                    'device_id': formatted_id,
+                    'html_path': html_path
+                }
+            )
             return jsonify({'error': 'Template not found'}), 404
             
         # Get last modified time
@@ -391,7 +988,13 @@ def get_device_preview(device_id):
                 if if_modified_since >= last_modified:
                     return '', 304  # Not Modified
             except ValueError:
-                pass
+                StructuredLogger.warning(
+                    'Invalid If-Modified-Since header',
+                    extra={
+                        'device_id': formatted_id,
+                        'if_modified_since': if_modified_since
+                    }
+                )
             
         with open(html_path, 'r') as f:
             html_content = f.read()
@@ -421,7 +1024,13 @@ def get_device_preview(device_id):
         # Insert script before closing body tag
         html_content = html_content.replace('</body>', f'{scroll_script}</body>')
         
-        log_with_timestamp(f"Serving HTML with size: {len(html_content)} bytes")
+        StructuredLogger.info(
+            'Serving HTML content',
+            extra={
+                'device_id': formatted_id,
+                'content_size': len(html_content)
+            }
+        )
             
         response = make_response(html_content)
         response.headers['Content-Type'] = 'text/html'
@@ -431,7 +1040,11 @@ def get_device_preview(device_id):
         return response
         
     except Exception as e:
-        log_with_timestamp(f"Error getting preview for device {formatted_id}: {str(e)}")
+        StructuredLogger.error(
+            'Failed to get device preview',
+            extra={'device_id': formatted_id},
+            error=e
+        )
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/devices/<device_id>/static/<path:filename>', methods=['GET'])
@@ -526,13 +1139,18 @@ def get_device_logs(device_id):
         log_with_timestamp(f"Error getting logs for device {device_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-def monitor_gitlab_changes():
+@log_duration
+def monitor_gitlab_changes() -> None:
     """Background thread to monitor GitLab changes."""
     while True:
         try:
             # Get all devices with GitLab configuration
             devices = run_async(get_devices_with_github())
-            log_with_timestamp(f"[POLL] Found {len(devices)} devices with GitHub configuration")
+            
+            StructuredLogger.info(
+                'Starting GitLab polling cycle',
+                extra={'device_count': len(devices)}
+            )
             
             for device_id, device in devices.items():
                 try:
@@ -544,29 +1162,70 @@ def monitor_gitlab_changes():
                     
                     # Check if we need to update
                     if clone_or_pull_repo(formatted_id, device['repo_url'], device.get('repo_branch', 'main')):
-                        log_with_timestamp(f"[UPDATE] Changes detected for device {formatted_id}")
+                        StructuredLogger.info(
+                            'Changes detected for device',
+                            extra={
+                                'device_id': formatted_id,
+                                'repo_url': device['repo_url'],
+                                'branch': device.get('repo_branch', 'main')
+                            }
+                        )
                         # Notify frontend about the update
                         socketio.emit('device_updated', {'device_id': device_id})
                     
-                except Exception as e:
-                    log_with_timestamp(f"[ERROR] Error monitoring device {device_id}: {str(e)}")
+                except Exception as device_error:
+                    StructuredLogger.error(
+                        'Failed to monitor device',
+                        extra={
+                            'device_id': device_id,
+                            'repo_url': device.get('repo_url'),
+                            'branch': device.get('repo_branch', 'main')
+                        },
+                        error=device_error
+                    )
             
             # Wait before next check
             time.sleep(10)  # Check every 10 seconds
             
         except Exception as e:
-            log_with_timestamp(f"[ERROR] Error in monitoring thread: {str(e)}")
+            StructuredLogger.error(
+                'Error in monitoring thread',
+                error=e
+            )
             time.sleep(10)  # Wait before retrying
 
-def mark_all_devices_offline():
+@RetryUtils.with_retries(max_attempts=3)
+@log_duration
+def mark_all_devices_offline() -> None:
     """Mark all devices as offline during server startup."""
     try:
         devices = run_async(get_devices_with_github())
+        
+        StructuredLogger.info(
+            'Marking all devices as offline',
+            extra={'device_count': len(devices)}
+        )
+        
         for device_id in devices:
-            update_device_status(device_id, 'OFFLINE', 'Server restarted')
-        log_with_timestamp(f"Marked {len(devices)} devices as offline")
+            try:
+                update_device_status(device_id, 'OFFLINE', 'Server restarted')
+            except Exception as device_error:
+                StructuredLogger.error(
+                    'Failed to mark device as offline',
+                    extra={'device_id': device_id},
+                    error=device_error
+                )
+                # Continue with other devices even if one fails
+                continue
+        
+        StructuredLogger.info('Successfully marked all devices as offline')
+        
     except Exception as e:
-        log_with_timestamp(f"Error marking devices offline: {str(e)}")
+        StructuredLogger.error(
+            'Failed to mark devices as offline',
+            error=e
+        )
+        raise
 
 if __name__ == '__main__':
     # Mark all devices as offline on startup
@@ -575,7 +1234,7 @@ if __name__ == '__main__':
     # Start GitLab monitoring thread
     monitor_thread = threading.Thread(target=monitor_gitlab_changes, daemon=True)
     monitor_thread.start()
-    log_with_timestamp("Started GitLab monitoring thread")
+    StructuredLogger.info("Started GitLab monitoring thread")
     
     # Start Flask server
     socketio.run(app, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
