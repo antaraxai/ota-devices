@@ -14,29 +14,55 @@ def create_backup(device_id: str) -> Optional[str]:
         device_id: ID of the device to backup
         
     Returns:
-        Optional[str]: Path to the backup if successful, None if failed
+        Optional[str]: Path to the backup if successful, None if backup not needed or failed
     """
     try:
+        # Get and validate work directory
         work_dir = get_device_work_dir(device_id)
-        if not os.path.exists(work_dir):
-            return None  # Nothing to backup
+        if not os.path.exists(work_dir) or not os.path.exists(os.path.join(work_dir, '.git')):
+            # No backup needed for non-existent or non-git directories
+            return None
             
-        # Create backups directory if it doesn't exist
-        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        backups_dir = os.path.join(current_dir, 'device_backups', device_id)
-        os.makedirs(backups_dir, exist_ok=True)
+        # Ensure we have read access to the work directory
+        if not os.access(work_dir, os.R_OK):
+            StructuredLogger.error(
+                'No read access to workspace directory',
+                extra={'device_id': device_id, 'work_dir': work_dir}
+            )
+            return None
+            
+        # Create backups directory with proper permissions
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        backups_dir = os.path.join(base_dir, 'device_backups', device_id)
+        os.makedirs(backups_dir, mode=0o755, exist_ok=True)
         
         # Create timestamp for backup
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_path = os.path.join(backups_dir, f'backup_{timestamp}')
         
-        # Create backup
-        shutil.copytree(work_dir, backup_path)
+        # Remove target directory if it already exists
+        if os.path.exists(backup_path):
+            shutil.rmtree(backup_path)
+        
+        # Create backup with proper permissions
+        shutil.copytree(work_dir, backup_path, dirs_exist_ok=True)
+        
+        # Set proper permissions on backup directory
+        for root, dirs, files in os.walk(backup_path):
+            os.chmod(root, 0o755)  # rwxr-xr-x for directories
+            for d in dirs:
+                os.chmod(os.path.join(root, d), 0o755)
+            for f in files:
+                os.chmod(os.path.join(root, f), 0o644)  # rw-r--r-- for files
+        
         StructuredLogger.info(
             'Created workspace backup',
             extra={
                 'device_id': device_id,
-                'backup_path': backup_path
+                'backup_path': backup_path,
+                'size': sum(os.path.getsize(os.path.join(root, f))
+                           for root, _, files in os.walk(backup_path)
+                           for f in files)
             }
         )
         
@@ -48,15 +74,25 @@ def create_backup(device_id: str) -> Optional[str]:
         
         while len(backups) > 5:
             oldest_backup = os.path.join(backups_dir, backups[0])
-            shutil.rmtree(oldest_backup)
-            backups.pop(0)
-            StructuredLogger.info(
-                'Removed old backup',
-                extra={
-                    'device_id': device_id,
-                    'backup_path': oldest_backup
-                }
-            )
+            try:
+                shutil.rmtree(oldest_backup)
+                backups.pop(0)
+                StructuredLogger.info(
+                    'Removed old backup',
+                    extra={
+                        'device_id': device_id,
+                        'backup_path': oldest_backup
+                    }
+                )
+            except Exception as e:
+                StructuredLogger.warning(
+                    'Failed to remove old backup',
+                    extra={
+                        'device_id': device_id,
+                        'backup_path': oldest_backup
+                    },
+                    error=e
+                )
             
         return backup_path
         

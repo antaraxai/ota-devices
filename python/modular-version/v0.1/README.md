@@ -98,6 +98,49 @@ This document outlines the production-grade features implemented in the modular 
     - Graceful degradation
     - Auto recovery
 
+## Running the GitLab Controller
+
+The GitLab Controller script (`gitlab_controller.py`) is used to monitor and manage GitLab repository updates. Here's how to run it:
+
+1. **Environment Setup**
+   ```bash
+   # Required environment variables
+   export GITLAB_USERNAME='your_gitlab_username'
+   export GITLAB_TOKEN='your_gitlab_token'
+   ```
+
+2. **Configuration**
+   Create a JSON configuration file (e.g., `config.json`):
+   ```json
+   {
+     "supabase_url": "your_supabase_url",
+     "supabase_key": "your_supabase_key",
+     "device_token": "your_device_token",
+     "work_dir": "/path/to/work/directory"
+   }
+   ```
+
+3. **Running the Script**
+   ```bash
+   python gitlab_controller.py --device-id YOUR_DEVICE_ID --config "$(cat config.json)"
+   ```
+
+4. **Script Behavior**
+   - Monitors GitLab repository for changes
+   - Updates device status in Supabase
+   - Downloads and processes updates when available
+   - Handles errors and retries gracefully
+
+5. **Required Files**
+   Make sure all these files are in the same directory:
+   - `gitlab_controller.py` - Main controller script
+   - `gitlab_ota_manager.py` - OTA update manager
+   - `gitlab_file_manager.py` - File operations manager
+   - `gitlab_connection_manager.py` - Supabase connection manager
+   - `gitlab_file_monitor.py` - File change monitor
+   - `gitlab_version_checker.py` - Version check utility
+   - `current_logger.py` - Logging utility
+
 ## Implementation Notes
 
 Each missing component includes sample code in the codebase. To implement any of these features:

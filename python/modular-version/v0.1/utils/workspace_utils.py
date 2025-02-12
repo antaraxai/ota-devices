@@ -17,11 +17,13 @@ def create_directory_if_not_exists(directory_path: str) -> None:
 
 def get_shared_repo_dir() -> str:
     """Get the shared repository directory."""
-    return os.path.join(os.path.dirname(__file__), '..', 'shared_repos')
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, 'shared_repos')
 
 def get_device_work_dir(device_id: str) -> str:
     """Get the working directory for a device."""
-    return os.path.join(os.path.dirname(__file__), '..', 'workspaces', device_id)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, 'workspaces', device_id)
 
 def setup_device_workspace(device_id: str, device: Dict[str, Any]) -> None:
     """Set up a clean workspace for the device."""
@@ -32,6 +34,32 @@ def setup_device_workspace(device_id: str, device: Dict[str, Any]) -> None:
         
         # Create workspace directory if it doesn't exist
         os.makedirs(work_dir, exist_ok=True)
+        
+        # Copy gitlab_controller.py to the workspace
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        controller_src = os.path.join(base_dir, 'gitlab_controller.py')
+        controller_dst = os.path.join(work_dir, 'gitlab_controller.py')
+        
+        if os.path.exists(controller_src):
+            shutil.copy2(controller_src, controller_dst)
+            os.chmod(controller_dst, 0o644)  # Make it readable
+            
+            StructuredLogger.info(
+                'Copied controller script to workspace',
+                extra={
+                    'device_id': device_id,
+                    'source': controller_src,
+                    'destination': controller_dst
+                }
+            )
+        else:
+            StructuredLogger.error(
+                'Controller script not found',
+                extra={
+                    'device_id': device_id,
+                    'expected_path': controller_src
+                }
+            )
         
         StructuredLogger.info(
             'Set up device workspace',

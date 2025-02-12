@@ -13,7 +13,7 @@ class SecurityUtils:
     
     # Common validation patterns
     PATTERNS = {
-        'device_id': r'^[\w\-]+$',
+        'device_id': r'^[0-9a-zA-Z\-]+$',  # More permissive UUID pattern
         'repo_url': r'^[\w\-:/\.@]+$',
         'branch': r'^[\w\-./]+$',
         'path': r'^[\w\-./]+$',
