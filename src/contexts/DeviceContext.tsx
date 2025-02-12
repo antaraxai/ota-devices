@@ -210,50 +210,24 @@ const DeviceProvider: React.FC = ({ children }) => {
 
   const downloadDeviceScriptFile = async (device: Device): Promise<void> => {
     try {
-      // First generate/update the script
-      const fileName = await generateDeviceScript(device);
-      console.log('Generated script filename:', fileName);
-
-      // Download the generated script
-      const { data: scriptBlob, error: downloadError } = await serviceRoleClient.storage
-        .from('device-scripts')
-        .download(fileName);
-
-      if (downloadError || !scriptBlob) {
-        console.error('Error downloading script:', downloadError);
-        throw new Error('Failed to download generated script');
-      }
-
-      // Create a URL for the blob
-      const url = window.URL.createObjectURL(scriptBlob);
+      // Get the API URL from environment
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      
+      // Create the download URL
+      const downloadUrl = `${apiUrl}/api/devices/${device.id}/download-script`;
       
       // Create a temporary link element
       const link = document.createElement('a');
-      link.href = url;
+      link.href = downloadUrl;
       link.download = 'device-script.py';
       
       // Append to body, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      // Clean up the URL
-      window.URL.revokeObjectURL(url);
 
-      // Update device's download timestamp
-      const { error: updateError } = await supabase
-        .from('devices')
-        .update({
-          timestamp_download: new Date().toISOString()
-        })
-        .eq('id', device.id);
-
-      if (updateError) {
-        console.error('Error updating device timestamp:', updateError);
-        // Don't throw here since the download already succeeded
-      }
-
-      toast.success('Script downloaded successfully');
+      // The backend will handle updating the timestamp
+      toast.success('Script download initiated');
     } catch (error) {
       console.error('Error downloading script:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to download script');
