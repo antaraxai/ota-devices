@@ -11,7 +11,7 @@ class GitLabOTAManager:
         self.repo_branch = None
         self.gitlab_token = None
         self.gitlab_username = None
-        self.repo_path = None
+        self.repo_paths = ['src/templates/index.html', 'src/templates/style.css', 'src/templates/script.js']
         self.check_interval = 10  # seconds between checks
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.clone_dir = os.path.join(self.base_dir, 'repo-clone')
@@ -19,13 +19,13 @@ class GitLabOTAManager:
         self.logger.log("GitLab OTA Manager initialized")
 
     def configure(self, repo_url: str, repo_branch: str, gitlab_token: str,
-                gitlab_username: str, repo_path: str, check_interval: int = 10):
+                gitlab_username: str, repo_paths: list = None, check_interval: int = 10):
         """Configure GitLab repository settings."""
         self.repo_url = repo_url
         self.repo_branch = repo_branch
         self.gitlab_token = gitlab_token
         self.gitlab_username = gitlab_username
-        self.repo_path = repo_path
+        self.repo_paths = repo_paths or self.repo_paths
         self.check_interval = check_interval
         self.logger.log("GitLab OTA Manager configured")
 
@@ -36,13 +36,17 @@ class GitLabOTAManager:
                 self.logger.log("Missing required credentials for Git URL")
                 return None
 
-            # Parse the URL and add credentials
+            # Parse the URL and add token
             parsed = urlparse(self.repo_url)
-            auth_netloc = f"{self.gitlab_username}:{self.gitlab_token}@{parsed.netloc}"
-            auth_url = parsed._replace(netloc=auth_netloc)
-            
-            # Convert back to string
-            final_url = urlunparse(auth_url)
+            # Always use oauth2 token authentication
+            if parsed.netloc == 'gitlab.com':
+                # For gitlab.com, use oauth2 token in URL
+                final_url = f"https://oauth2:{self.gitlab_token}@gitlab.com/{'/'.join(parsed.path.split('/')[1:])}"
+            else:
+                # For self-hosted GitLab, also use oauth2 token
+                auth_netloc = f"oauth2:{self.gitlab_token}@{parsed.netloc}"
+                auth_url = parsed._replace(netloc=auth_netloc)
+                final_url = urlunparse(auth_url)
             self.logger.log(f"Created authenticated URL (credentials hidden)")
             return final_url
 
@@ -90,8 +94,9 @@ class GitLabOTAManager:
                     self.logger.log(f"Error fetching commit: {fetch_result.stderr}")
                     return None
 
+                # Get latest commit for all files
                 file_log = subprocess.run(
-                    ['git', 'log', '-1', '--format=%H', branch_commit, '--', self.repo_path],
+                    ['git', 'log', '-1', '--format=%H', branch_commit, '--'] + self.repo_paths,
                     cwd=temp_dir,
                     capture_output=True,
                     text=True
@@ -134,7 +139,7 @@ class GitLabOTAManager:
         """Check for updates in the GitLab repository."""
         try:
             if not all([self.repo_url, self.repo_branch, self.gitlab_token,
-                       self.gitlab_username, self.repo_path]):
+                       self.gitlab_username, self.repo_paths]):
                 self.logger.log("GitLab configuration incomplete")
                 return False
 

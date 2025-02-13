@@ -28,6 +28,25 @@ class GitLabController:
         if not self.connection_manager.configure(supabase_url, supabase_key, device_id, device_token):
             raise Exception("Failed to configure connection manager")
             
+        # Get device configuration and store it
+        self.connection_manager.device_config = self.connection_manager.get_device_config()
+        if not self.connection_manager.device_config:
+            raise Exception("Failed to get device configuration")
+            
+        # Configure OTA manager with device config
+        gitlab_token = os.getenv('GITLAB_PERSONAL_ACCESS_TOKEN')
+        if not gitlab_token:
+            raise Exception("GITLAB_PERSONAL_ACCESS_TOKEN not found in environment")
+            
+        self.ota_manager.configure(
+            repo_url=self.connection_manager.device_config.get('repo_url'),
+            repo_branch=self.connection_manager.device_config.get('repo_branch', 'main'),
+            gitlab_token=gitlab_token,
+            gitlab_username='oauth2',  # For personal access token
+            repo_paths=self.connection_manager.device_config.get('repo_paths', ['src/templates/index.html', 'src/templates/style.css', 'src/templates/script.js']),
+            check_interval=self.connection_manager.device_config.get('check_interval', 10)
+        )
+            
         # Add running flag for thread control
         self.running = True
         
@@ -50,48 +69,14 @@ class GitLabController:
         self.connection_manager.update_device_status('OFFLINE')
         sys.exit(0)
 
-    def _configure_components(self):
-        """Configure OTA and File managers with device settings."""
-        try:
-            # Get device configuration
-            config = self.connection_manager.get_device_config()
-            if not config:
-                return False
-
-            # Get GitLab credentials from environment
-            gitlab_username = os.getenv('GITLAB_USERNAME')
-            gitlab_token = os.getenv('GITLAB_TOKEN')
-            
-            if not gitlab_username or not gitlab_token:
-                self.logger.log("GitLab credentials not found in environment")
-                return False
-
-            # Configure OTA manager
-            self.ota_manager.configure(
-                repo_url=config.get('repo_url'),
-                repo_branch=config.get('repo_branch', 'main'),
-                gitlab_token=gitlab_token,
-                gitlab_username=gitlab_username,
-                repo_path=config.get('repo_path', 'src/templates/index.html'),
-                check_interval=config.get('check_interval', 10)
-            )
-            return True
-
-        except Exception as e:
-            self.logger.log(f"Error configuring components: {e}")
-            return False
-
     def clone_repository(self, workspace_path: str) -> bool:
         """Clone the repository to the specified workspace."""
         try:
-            if not self.connection_manager.device_config:
-                self.logger.log("Device configuration not available")
+            if not self.ota_manager.repo_url:
+                self.logger.log("Repository URL not available")
                 return False
 
-            repo_url = self.connection_manager.device_config.get('repo_url')
-            if not repo_url:
-                self.logger.log("Repository URL not found in device configuration")
-                return False
+            repo_url = self.ota_manager.repo_url
 
             # Get GitLab credentials
             gitlab_username = os.getenv('GITLAB_USERNAME')
@@ -100,14 +85,26 @@ class GitLabController:
                 self.logger.log("GitLab credentials not found in environment")
                 return False
 
-            # Parse and add credentials to URL
+            # Parse and add token to URL
             parsed = urlparse(repo_url)
-            auth_url = parsed._replace(
-                netloc=f"{gitlab_username}:{gitlab_token}@{parsed.netloc}"
-            )
-            auth_repo_url = urlunparse(auth_url)
+            if 'gitlab.com' in parsed.netloc:
+                # For gitlab.com, use oauth2 token in URL
+                auth_repo_url = f"https://oauth2:{gitlab_token}@gitlab.com/{'/'.join(parsed.path.split('/')[1:])}"
+            else:
+                # For self-hosted GitLab, use HTTP basic auth
+                auth_url = parsed._replace(
+                    netloc=f"{gitlab_username}:{gitlab_token}@{parsed.netloc}"
+                )
+                auth_repo_url = urlunparse(auth_url)
 
-            # Set git config globally
+            # Set up Git credentials
+            git_creds_path = os.path.expanduser('~/.git-credentials')
+            parsed = urlparse(auth_repo_url)
+            with open(git_creds_path, 'w') as f:
+                f.write(f"https://oauth2:{self.ota_manager.gitlab_token}@{parsed.netloc}\n")
+            os.chmod(git_creds_path, 0o600)
+
+            # Configure Git
             subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], capture_output=True)
 
             # Clone the repository
@@ -119,8 +116,8 @@ class GitLabController:
             self.logger.log("Created fresh workspace")
 
             # Clone with branch specified
-            branch = self.connection_manager.device_config.get('repo_branch', 'main')
-            clone_cmd = ['git', 'clone', '-b', branch, auth_repo_url, workspace_path]
+            clone_cmd = ['git', 'clone', '-b', self.ota_manager.repo_branch, '--single-branch', '--depth', '1',
+                        self.ota_manager.repo_url, workspace_path]
             result = subprocess.run(clone_cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
@@ -144,21 +141,37 @@ class GitLabController:
             # Get authenticated URL
             auth_url = self.ota_manager.create_git_url_with_auth()
             
-            # Download file using sparse checkout
-            if not self.file_manager.download_single_file(
-                auth_url=auth_url,
-                repo_path=self.ota_manager.repo_path,
-                repo_branch=self.ota_manager.repo_branch,
-                work_dir=self.work_dir
-            ):
-                return False
+            # Download and copy each file
+            for repo_path in self.ota_manager.repo_paths:
+                # Download file using sparse checkout
+                if not self.file_manager.download_single_file(
+                    auth_url=auth_url,
+                    repo_path=repo_path,
+                    repo_branch=self.ota_manager.repo_branch,
+                    work_dir=self.work_dir
+                ):
+                    return False
 
-            # Copy file to destination
-            source_path = os.path.join(self.work_dir, self.ota_manager.repo_path)
-            dest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), self.ota_manager.repo_path)
-            
-            if not self.file_manager.copy_file(source_path, dest_path):
-                return False
+                # Copy file to destination
+                source_path = os.path.join(self.work_dir, repo_path)
+                dest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), repo_path)
+                
+                # Create destination directory if it doesn't exist
+                dest_dir = os.path.dirname(dest_path)
+                if not os.path.exists(dest_dir):
+                    self.logger.log(f"Creating destination directory: {dest_dir}")
+                    os.makedirs(dest_dir)
+                
+                # Create empty file if it doesn't exist
+                if not os.path.exists(dest_path):
+                    self.logger.log(f"Creating empty file: {dest_path}")
+                    with open(dest_path, 'w') as f:
+                        pass
+                
+                # Copy file if it was downloaded successfully
+                if os.path.exists(source_path):
+                    if not self.file_manager.copy_file(source_path, dest_path):
+                        return False
 
             return True
 
@@ -172,10 +185,6 @@ class GitLabController:
             print("\nStarting GitLab Controller...")
             # Initial setup
             self.connection_manager.update_device_status('ONLINE', 'Monitor started')
-            print("Configuring components...")
-            if not self._configure_components():
-                raise Exception("Failed to configure components")
-
             self.logger.log("\nStarting GitLab file monitor...")
             print("Entering main monitoring loop...\n")
             
