@@ -48,6 +48,10 @@ ENV/
 .env.test
 .env.production
 
+# Allow example environment files
+!.env.example
+!.env.template
+
 # Project specific
 
 # Version checker files
