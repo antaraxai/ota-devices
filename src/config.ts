@@ -1,9 +1,9 @@
 // Configuration for API endpoints
 export const config = {
-  apiBaseUrl: 'http://157.245.147.73:5001',
-  socketUrl: 'http://157.245.147.73:5001',
+  apiBaseUrl: 'http://localhost:5001',
+  socketUrl: 'http://localhost:5003',
   corsOptions: {
-    origin: 'http://157.245.147.73:3001',
+    origin: 'http://localhost:3001',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true

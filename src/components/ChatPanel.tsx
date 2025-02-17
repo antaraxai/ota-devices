@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { FaPaperPlane, FaRobot } from 'react-icons/fa';
+import { config } from '../config';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  deviceId?: string;
+}
+
+export default function ChatPanel({ deviceId }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,16 +37,24 @@ export default function ChatPanel() {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
-      const response = await fetch('http://localhost:5001/api/chat', {
+      const response = await fetch(`${config.apiBaseUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           message: userMessage,
           history: messages,
+          device_id: deviceId
         }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send message');
+      }
 
       const data = await response.json();
       if (data.error) {
@@ -54,7 +67,7 @@ export default function ChatPanel() {
       console.error('Error sending message:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.'
+        content: 'Unable to connect to the device. Please check your connection and try again.'
       }]);
     } finally {
       setIsLoading(false);

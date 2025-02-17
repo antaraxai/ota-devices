@@ -24,18 +24,18 @@ load_dotenv(env_path)
 # Debug: Print environment variables
 print('Environment variables:')
 print(f'VITE_SUPABASE_URL exists: {"VITE_SUPABASE_URL" in environ}')
-print(f'VITE_SUPABASE_SERVICE_ROLE_KEY exists: {"VITE_SUPABASE_SERVICE_ROLE_KEY" in environ}')
+print(f'VITE_SUPABASE_ANON_KEY exists: {"VITE_SUPABASE_ANON_KEY" in environ}')
 
 # Initialize Supabase client
 supabase = None
-if 'VITE_SUPABASE_URL' in environ and 'VITE_SUPABASE_SERVICE_ROLE_KEY' in environ:
+if 'VITE_SUPABASE_URL' in environ and 'VITE_SUPABASE_ANON_KEY' in environ:
     supabase = create_client(
         environ['VITE_SUPABASE_URL'],
-        environ['VITE_SUPABASE_SERVICE_ROLE_KEY']
+        environ['VITE_SUPABASE_ANON_KEY']
     )
     print('Successfully initialized Supabase client')
 else:
-    print('Warning: VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_ROLE_KEY environment variables are required')
+    print('Warning: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables are required')
 
 def is_valid_device_id(device_id: str) -> bool:
     """Validate device ID format (UUID)."""

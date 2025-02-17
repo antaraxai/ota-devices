@@ -3,12 +3,18 @@ import cors from 'cors';
 import { supabase } from './lib/supabase.js';
 import path from 'path';
 import fs from 'fs';
+import OpenAI from 'openai';
 
 const app = express();
-const port = process.env.PORT || 5173;
+const port = process.env.PORT || 5001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept', 'Authorization']
+}));
 app.use(express.json());
 
 // API Routes
@@ -105,6 +111,57 @@ app.post('/api/devices/:deviceId/readings', async (req, res) => {
   } catch (error) {
     console.error('Error saving device readings:', error);
     res.status(500).json({ error: 'Failed to save device readings' });
+  }
+});
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// Chat endpoint
+app.post('/api/chat', async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
+    const { message, history } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    try {
+      const chatCompletion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          ...history,
+          { role: 'user', content: message }
+        ]
+      });
+
+      if (!chatCompletion.choices || chatCompletion.choices.length === 0) {
+        throw new Error('No response from OpenAI');
+      }
+
+      const aiResponse = chatCompletion.choices[0].message.content;
+      res.json({ success: true, message: aiResponse });
+    } catch (apiError) {
+      // Handle rate limit and quota errors specifically
+      if (apiError.status === 429) {
+        console.error('OpenAI API rate limit or quota exceeded:', apiError);
+        return res.status(503).json({
+          success: false,
+          error: 'Service temporarily unavailable due to API limits. Please try again later.'
+        });
+      }
+      throw apiError; // Re-throw other API errors
+    }
+  } catch (error) {
+    console.error('Error in chat endpoint:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process chat request';
+    const statusCode = error.status || 500;
+    res.status(statusCode).json({ success: false, error: errorMessage });
   }
 });
 

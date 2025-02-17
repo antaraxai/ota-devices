@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { useDevices } from '../contexts/DeviceContext';
 import { toast } from 'react-toastify';
 import DeviceController from './DeviceController';
+import ChatPanel from './ChatPanel';
 // import DemoView from './DemoView';
 
 type TabType = 'info' | 'edit' | 'chat' | 'controller';
@@ -380,30 +381,7 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
         );
 
       case 'chat':
-        return (
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Chat messages will go here */}
-              <div className="text-center text-gray-500">
-                Chat functionality coming soon...
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200">
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                />
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        );
+        return <ChatPanel deviceId={device.id} />;
     }
   };
 

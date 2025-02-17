@@ -144,9 +144,18 @@ def get_device_status(device_id: str) -> Dict[str, Any]:
     try:
         device_id = SecurityUtils.validate_input(device_id, pattern_name='device_id')
         
-        response = supabase.table('devices').select('*').eq('id', device_id).single().execute()
-        device = response.data
-        
+        # Add connection error handling
+        try:
+            response = supabase.table('devices').select('*').eq('id', device_id).single().execute()
+            device = response.data
+        except Exception as conn_error:
+            StructuredLogger.error(
+                'Database connection error',
+                extra={'device_id': device_id, 'error_type': 'connection'},
+                error=conn_error
+            )
+            raise ValueError(f"Unable to connect to database: {str(conn_error)}")
+            
         if not device:
             raise ValueError(f"Device {device_id} not found")
             
