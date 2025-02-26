@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Device } from '../types';
 import { FaGithub, FaCodeBranch, FaFolder, FaInfo, FaPencilAlt, FaComments, FaDownload, FaTerminal, FaDesktop } from 'react-icons/fa';
 import { format } from 'date-fns';
 import { useDevices } from '../contexts/DeviceContext';
 import { toast } from 'react-toastify';
 import DeviceController from './DeviceController';
-import ChatPanel from './ChatPanel';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { fetchDeviceStatusData } from '../api/device';
+import { de } from 'date-fns/locale';
 // import DemoView from './DemoView';
 
 type TabType = 'info' | 'edit' | 'chat' | 'controller';
@@ -28,6 +31,74 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [editedDevice, setEditedDevice] = useState<Device>(device);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusData, setStatusData] = useState<Array<{time: string; status: number}>>([]);
+
+  useEffect(() => {
+    const fetchDeviceData = async () => {
+      try {
+        console.log(device.id);
+        
+        const { data, error } = await supabase
+          .from('device_data')
+          .select('*')
+          .eq('device_id', device.id)
+          // .eq('data_type', 'status')
+          // .order('timestamp', { ascending: true });
+
+        if (error) throw error;
+
+        if (data) {
+          console.log('Fetched device data:', data);
+          setStatusData(data.map(item => ({
+            time: format(new Date(item.timestamp), 'HH:mm'),
+            status: parseInt(item.value)
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching device data:', error);
+        toast.error('Failed to fetch device status data');
+        setStatusData([]); // Reset status data on error
+      }
+    };
+
+    if (isOpen && device.id) {
+      fetchDeviceData();
+
+      // Subscribe to real-time updates
+      const subscription = supabase
+        .channel('device-data-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'device_data',
+            filter: `device_id=eq.${device.id} AND data_type=eq.status`
+          },
+          () => {
+            fetchDeviceData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [device.id, isOpen]);
+
+  const handleDownload = async () => {
+    setIsLoading(true);
+    try {
+      await downloadDeviceScriptFile(device);
+    } catch (error) {
+      console.error('Error downloading script:', error);
+      toast.error('Failed to download script');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const hasGitHubConfig = Boolean(device.repo_url && device.repo_path && device.github_token);
   const { updateDevice, downloadDeviceScriptFile } = useDevices();
 
@@ -58,19 +129,6 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
     return format(new Date(dateString), 'PPpp');
   };
 
-  const handleDownload = async () => {
-    try {
-      setIsDownloading(true);
-      await downloadDeviceScriptFile(device);
-      toast.success('Script downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading script:', error);
-      toast.error('Failed to download script');
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'controller':
@@ -80,6 +138,30 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
       case 'info':
         return (
           <div className="space-y-8">
+            {/* Performance Metrics */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
+                Performance Metrics
+              </h3>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={statusData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 1]} ticks={[0, 1]} tickFormatter={(value) => value === 1 ? 'Online' : 'Offline'} />
+                    <Tooltip
+                      formatter={(value) => value === 1 ? 'Online' : 'Offline'}
+                      labelFormatter={(label) => `Time: ${label}`}
+                    />
+                    <Bar dataKey="status">
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.status === 1 ? '#4ade80' : '#f87171'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
             {/* Installation Details */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
@@ -195,6 +277,47 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Performance Graph */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900 pb-2 border-b border-gray-200">
+                Performance Metrics
+              </h3>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={[
+                        { time: '00:00', cpu: 45, memory: 60 },
+                        { time: '04:00', cpu: 55, memory: 65 },
+                        { time: '08:00', cpu: 75, memory: 70 },
+                        { time: '12:00', cpu: 65, memory: 75 },
+                        { time: '16:00', cpu: 80, memory: 80 },
+                        { time: '20:00', cpu: 60, memory: 65 },
+                      ]}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="time" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="cpu" stroke="#8884d8" name="CPU Usage (%)" />
+                      <Line type="monotone" dataKey="memory" stroke="#82ca9d" name="Memory Usage (%)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 flex justify-center space-x-8">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-[#8884d8] rounded-full mr-2" />
+                    <span className="text-sm text-gray-600">CPU Usage</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-[#82ca9d] rounded-full mr-2" />
+                    <span className="text-sm text-gray-600">Memory Usage</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* OTA Updates */}
             <div className="space-y-4">
@@ -381,7 +504,30 @@ export const DeviceDrawer: React.FC<DeviceDrawerProps> = ({
         );
 
       case 'chat':
-        return <ChatPanel deviceId={device.id} />;
+        return (
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Chat messages will go here */}
+              <div className="text-center text-gray-500">
+                Chat functionality coming soon...
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        );
     }
   };
 

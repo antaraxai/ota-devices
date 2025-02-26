@@ -38,7 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          role: 'user' // Set default role as 'user' for new registrations
+        }
       }
     })
     if (error) throw error

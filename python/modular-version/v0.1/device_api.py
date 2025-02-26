@@ -6,14 +6,16 @@ from flask_socketio import SocketIO
 from supabase import create_client
 from os import environ
 import traceback
-from datetime import datetime
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
 import tempfile
 import zipfile
 import os
 import shutil
 import re
 import json
+import pandas as pd
+from collections import defaultdict
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -89,7 +91,20 @@ from utils.device_logs import get_device_logs
 from utils.git_utils import monitor_gitlab_changes
 from utils.workspace_utils import force_refresh, create_directory_if_not_exists, get_device_work_dir
 
+# Initialize Flask app and CORS
 app = Flask(__name__)
+cors_origins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173']
+CORS(app, resources={
+    r"/*": {
+        "origins": cors_origins,
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "If-Modified-Since"],
+        "supports_credentials": True
+    }
+})
+
+# Initialize SocketIO with CORS settings
+socketio = SocketIO(app, cors_allowed_origins=cors_origins)
 
 # Get CORS origin from environment
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3001').split(',')
@@ -163,6 +178,90 @@ def handle_force_refresh(device_id):
 def handle_device_logs(device_id):
     """Get logs for a specific device."""
     return jsonify(get_device_logs(device_id))
+
+@app.route('/api/analytics/recent', methods=['GET'])
+def get_recent_analytics():
+    """Get recent analytics data for all devices"""
+    try:
+        minutes = request.args.get('minutes', default=30, type=int)
+        time_threshold = (datetime.now() - timedelta(minutes=minutes)).isoformat()
+        
+        response = supabase.table('device_data')\
+            .select('*')\
+            .eq('data_type', 'status')\
+            .gte('timestamp', time_threshold)\
+            .execute()
+            
+        if not response.data:
+            return jsonify({
+                'message': 'No data available',
+                'data': {}
+            })
+        
+        df = pd.DataFrame(response.data)
+        values = df['value'].astype(float)
+        uptime_ratio = (values.sum() / len(values)) * 100
+        
+        analytics = {
+            'current_status': 'Online' if float(df.iloc[-1]['value']) == 1 else 'Offline',
+            'uptime_percentage': f"{uptime_ratio:.2f}%",
+            'status_changes': str(len(values[values.diff() != 0])),
+            'last_update': df.iloc[-1]['timestamp']
+        }
+        
+        return jsonify({
+            'message': 'Success',
+            'data': {
+                'status_data': response.data,
+                'analytics': analytics
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/device/<device_id>', methods=['GET'])
+def get_device_analytics(device_id):
+    """Get analytics data for a specific device"""
+    try:
+        minutes = request.args.get('minutes', default=30, type=int)
+        time_threshold = (datetime.now() - timedelta(minutes=minutes)).isoformat()
+        
+        response = supabase.table('device_data')\
+            .select('*')\
+            .eq('device_id', device_id)\
+            .eq('data_type', 'status')\
+            .gte('timestamp', time_threshold)\
+            .execute()
+            
+        if not response.data:
+            return jsonify({
+                'message': 'No data available',
+                'data': {
+                    'status_data': [],
+                    'analytics': {}
+                }
+            })
+        
+        df = pd.DataFrame(response.data)
+        values = df['value'].astype(float)
+        uptime_ratio = (values.sum() / len(values)) * 100
+        
+        analytics = {
+            'current_status': 'Online' if float(df.iloc[-1]['value']) == 1 else 'Offline',
+            'uptime_percentage': f"{uptime_ratio:.2f}%",
+            'status_changes': str(len(values[values.diff() != 0])),
+            'last_update': df.iloc[-1]['timestamp']
+        }
+        
+        return jsonify({
+            'message': 'Success',
+            'data': {
+                'status_data': response.data,
+                'analytics': analytics
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/devices/<device_id>/download-script', methods=['GET'])
 def handle_download_script(device_id):

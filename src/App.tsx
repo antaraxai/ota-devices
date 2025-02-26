@@ -6,6 +6,8 @@ import { DeviceProvider } from './contexts/DeviceContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
+import SubscriptionPage from './pages/Subscription';
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,7 +37,22 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               } />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <SubscriptionPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/subscription/success" element={
+                <ProtectedRoute>
+                  <SubscriptionSuccess />
+                </ProtectedRoute>
+              } />
             </Routes>
           </Router>
         </NotificationProvider>

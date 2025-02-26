@@ -25,6 +25,8 @@ export default function Auth() {
       } else {
         await signUp(email, password)
         toast.success('Account created! Please check your email for verification.')
+        setIsLogin(true) // Switch to login mode after successful registration
+        setPassword('') // Clear password field for security
       }
     } catch (err) {
       const error = err as AuthError
