@@ -78,3 +78,9 @@ dist/
 build/
 *.pyc
 .DS_Store
+supabase/.temp/storage-version
+supabase/.temp/rest-version
+supabase/.temp/postgres-version
+supabase/.temp/pooler-url
+supabase/.temp/gotrue-version
+supabase/.temp/cli-latest
