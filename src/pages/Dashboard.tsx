@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { FaUser, FaCog, FaBell, FaSignOutAlt, FaChartBar, FaHome, FaRocket, FaChevronLeft } from 'react-icons/fa';
+import { FaUser, FaCog, FaBell, FaSignOutAlt, FaChartBar, FaHome, FaRocket, FaChevronLeft, FaShieldAlt, FaLock, FaSync } from 'react-icons/fa';
 import DeploymentPreview from '../components/DeploymentPreview';
+import RoleBasedContent from '../components/RoleBasedContent';
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, roles, plan, isAdmin, refreshUserData } = useAuth();
   const { unreadCount, markAllAsRead } = useNotifications();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  useEffect(() => {
+    // Refresh user data when component mounts to ensure we have the latest plan and roles
+    refreshUserData();
+  }, []);
+  
+  // isAdmin is now directly provided by the AuthContext
 
   const handleSignOut = async () => {
     try {
@@ -47,15 +55,22 @@ export default function Dashboard() {
           >
             <FaRocket className="h-5 w-5" />
             <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Upgrade to Pro
+              Subscription
             </span>
           </button>
-          <button className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-            <FaChartBar className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Analytics
-            </span>
-          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => window.location.href = '/admin'}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md ${isSidebarCollapsed ? 'justify-center' : ''}`}
+            >
+              <FaShieldAlt className="h-5 w-5" />
+              <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                Admin Panel
+              </span>
+            </button>
+          )}
+
         </nav>
       </div>
 
@@ -97,6 +112,13 @@ export default function Dashboard() {
                         {user?.email}
                       </div>
                       <button
+                        onClick={() => window.location.href = '/profile'}
+                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <FaUser className="mr-3 h-4 w-4" />
+                        Profile
+                      </button>
+                      <button
                         onClick={() => {/* TODO: Implement settings */}}
                         className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
@@ -122,6 +144,87 @@ export default function Dashboard() {
         <main className="py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Deployments</h1>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Current Plan:</span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${plan === 'pro' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800'}`}>
+                {plan === 'pro' ? 'Pro' : 'Free'}
+              </span>
+              <button 
+                onClick={refreshUserData} 
+                className="ml-1 text-xs text-indigo-600 hover:text-indigo-800 p-1 rounded-full hover:bg-indigo-50"
+                title="Refresh user data"
+              >
+                <FaSync className="h-3 w-3" />
+              </button>
+              {roles.map((role, index) => (
+                <span 
+                  key={role} 
+                  className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    role === 'admin' 
+                      ? 'bg-green-100 text-green-800' 
+                      : role === 'user' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {role === 'admin' && <FaShieldAlt className="mr-1 h-3 w-3" />}
+                  {role}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Role-based content demonstration */}
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Role-Based Access Control Demo</h2>
+              
+              <RoleBasedContent
+                adminContent={
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-md p-4">
+                    <div className="flex items-center">
+                      <FaShieldAlt className="h-5 w-5 text-indigo-600 mr-2" />
+                      <h3 className="text-lg font-medium text-indigo-700">Admin Panel</h3>
+                    </div>
+                    <p className="mt-2 text-indigo-600">
+                      You have admin access. This content is only visible to users with the admin role.
+                      With the Pro plan, you can access advanced features and administrative tools.
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <button className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        <FaLock className="mr-2 h-4 w-4" />
+                        Admin Settings
+                      </button>
+                      <button className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        <FaUser className="mr-2 h-4 w-4" />
+                        Manage Users
+                      </button>
+                    </div>
+                  </div>
+                }
+                userContent={
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                    <div className="flex items-center">
+                      <FaUser className="h-5 w-5 text-gray-600 mr-2" />
+                      <h3 className="text-lg font-medium text-gray-700">User Dashboard</h3>
+                    </div>
+                    <p className="mt-2 text-gray-600">
+                      You have standard user access. Some features are only available with the Pro plan.
+                      Upgrade to Pro to access admin features and additional tools.
+                    </p>
+                    <div className="mt-4">
+                      <button 
+                        onClick={() => window.location.href = '/subscription'}
+                        className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        <FaRocket className="mr-2 h-4 w-4" />
+                        Upgrade to Pro
+                      </button>
+                    </div>
+                  </div>
+                }
+              />
+            </div>
           </div>
 
           <div className="bg-white rounded-lg shadow">

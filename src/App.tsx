@@ -8,6 +8,9 @@ import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import SubscriptionPage from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import Profile from './pages/Profile';
+import AdminPanel from './pages/AdminPanel';
+import AdminRoute from './components/AdminRoute';
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,6 +55,16 @@ function App() {
                 <ProtectedRoute>
                   <SubscriptionSuccess />
                 </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <AdminRoute>
+                  <AdminPanel />
+                </AdminRoute>
               } />
             </Routes>
           </Router>

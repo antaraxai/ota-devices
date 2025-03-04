@@ -1,56 +1,33 @@
 import { Router } from 'express';
-import { supabase } from '../lib/supabaseClient.js';
-
-const router = Router();
-
-// Handle device connection
-router.post('/devices/:deviceId/connection', async (req, res) => {
-  const { deviceId } = req.params;
-  const { connected } = req.body;
-
-  try {
-    const { data, error } = await supabase
-      .from('devices')
-      .update({ connected, last_connected: new Date().toISOString() })
-      .eq('id', deviceId);
-
-    if (error) throw error;
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error('Error updating device connection:', error);
-    res.status(500).json({ success: false, error: 'Failed to update device connection' });
-  }
-});
-
-// Handle device readings
-router.post('/devices/:deviceId/readings', async (req, res) => {
-  const { deviceId } = req.params;
-  const { readings } = req.body;
-
-  try {
-    const { data, error } = await supabase
-      .from('device_readings')
-      .insert([
-        {
-          device_id: deviceId,
-          readings,
-          timestamp: new Date().toISOString()
-        }
-      ]);
-
-    if (error) throw error;
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error('Error updating device readings:', error);
-    res.status(500).json({ success: false, error: 'Failed to update device readings' });
-  }
-});
-
-export default router;
-import { Router } from 'express';
 import { supabase } from '../lib/supabase';
+import { format } from 'date-fns';
 
 const router = Router();
+
+// Fetch device status data
+export const fetchDeviceStatusData = async (deviceId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('device_data')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('data_type', 'status')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (data) {
+      return data.map(item => ({
+        time: format(new Date(item.created_at), 'HH:mm'),
+        status: item.value === 'online' ? 1 : 0
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching device status data:', error);
+    throw error;
+  }
+};
 
 // Handle device connection
 router.post('/devices/:deviceId/connection', async (req, res) => {

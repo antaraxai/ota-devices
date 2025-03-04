@@ -57,7 +57,7 @@ class WebsiteErrorBoundary extends React.Component {
 
 
 const DeploymentPreview: React.FC = () => {
-  const { user } = useAuth();
+  const { user, plan, roles } = useAuth();
   const [websites, setWebsites] = useState<Website[]>([]);
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -372,6 +372,15 @@ const DeploymentPreview: React.FC = () => {
         throw new Error('User must be logged in to add a website');
       }
 
+      // Check if user has a pro plan
+      const isPro = plan === 'pro';
+
+      // Free users are limited to 5 websites
+      if (plan === 'free' && websites.length >= 5) {
+        toast.error('Free users are limited to 5 websites. Please upgrade to Pro to add more websites.');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('websites')
         .insert([{
@@ -394,6 +403,13 @@ const DeploymentPreview: React.FC = () => {
         notify_on_status_change: true
       });
       await fetchWebsites();
+
+      // Show different success messages based on subscription
+      if (!isPro) {
+        toast.success(`Website added! You can add ${5 - (websites.length + 1)} more websites with your free account.`);
+      } else {
+        toast.success('Website added successfully!');
+      }
     } catch (error) {
       console.error('Error adding website:', error);
       toast.error('Failed to add website. Please try again.');
@@ -480,10 +496,23 @@ const DeploymentPreview: React.FC = () => {
   return (
     <div className="space-y-6 relative">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Website Deployments</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Website Deployments</h2>
+          {plan === 'free' && (
+            <p className="mt-1 text-sm text-gray-500">
+              Free plan: {websites.length}/5 websites monitored
+              {websites.length >= 4 && (
+                <span className="ml-1 text-indigo-600">
+                  - <a href="/subscription" className="hover:underline">Upgrade to Pro</a> for unlimited monitoring
+                </span>
+              )}
+            </p>
+          )}
+        </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+          disabled={plan === 'free' && websites.length >= 5}
+          className={`inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 ${plan === 'free' && websites.length >= 5 ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -520,6 +549,13 @@ const DeploymentPreview: React.FC = () => {
                     <button
                       onClick={() => {
                         setSelectedWebsiteForAction(website);
+                        // Set form data with current website data
+                        setFormData({
+                          name: website.name,
+                          url: website.url,
+                          notify_on_status_change: website.notify_on_status_change || false,
+                          check_frequency: website.check_frequency || 'daily'
+                        });
                         setShowEditModal(true);
                       }}
                       className="p-2 text-gray-400 hover:text-gray-500"
@@ -558,7 +594,7 @@ const DeploymentPreview: React.FC = () => {
                     id="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
                   />
                 </div>
@@ -570,7 +606,7 @@ const DeploymentPreview: React.FC = () => {
                     id="url"
                     value={formData.url}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
                   />
                 </div>
@@ -624,7 +660,7 @@ const DeploymentPreview: React.FC = () => {
                     id="edit-name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
                   />
                 </div>
@@ -636,7 +672,7 @@ const DeploymentPreview: React.FC = () => {
                     id="edit-url"
                     value={formData.url}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     required
                   />
                 </div>
