@@ -30,9 +30,29 @@ VITE_STRIPE_PRO_URL=your_stripe_pro_url_here
 VITE_STRIPE_FREE_URL=your_stripe_free_url_here
 ```
 
-## Deployment Script
+## Deployment Scripts
 
-We provide a deployment script (`deploy.sh`) that simplifies the deployment process. The script supports several operations:
+We provide deployment scripts that simplify the deployment process.
+
+### Multi-Architecture Deployment Script (M1 Mac Compatible)
+
+For users with M1 Macs, we provide a specialized script (`deploy.sh`) that builds multi-architecture Docker images compatible with both ARM64 (Apple Silicon) and AMD64 (x86) platforms:
+
+```bash
+./deploy.sh
+```
+
+This script will:
+1. Build a multi-architecture Docker image using Docker Buildx
+2. Tag the image with both a timestamp version and 'latest'
+3. Push the image to GitLab Container Registry
+4. Handle authentication with the GitLab registry
+
+The script automatically builds for both ARM64 and AMD64 architectures, ensuring the image can run on any platform.
+
+### Standard Deployment Script
+
+Our standard deployment script also supports several operations:
 
 ### Building and Pushing Docker Images
 
