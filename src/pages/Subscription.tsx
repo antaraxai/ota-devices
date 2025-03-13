@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaChevronLeft, FaHome, FaRocket, FaChartBar, FaBell, FaUser, FaCog, FaSignOutAlt, FaCheck, FaCrown, FaUserCircle } from 'react-icons/fa';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { FaBell, FaUser, FaSignOutAlt, FaCheck, FaCrown, FaUserCircle } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { STRIPE_URLS, DEFAULT_TEST_MODE } from '../config/environment';
 import { hasActiveSubscription } from '../utils/subscriptionUtils';
+import MainSidebar from '../components/MainSidebar';
 
 const SubscriptionPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut, plan, refreshUserData } = useAuth();
+  const location = useLocation();
+  const { user, signOut, plan, refreshUserData, isAdmin } = useAuth();
+  
+  // Debug auth values
+  console.log('Subscription page - user:', user, 'isAdmin:', isAdmin, 'plan:', plan);
   const { unreadCount, markAllAsRead } = useNotifications();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -17,6 +22,7 @@ const SubscriptionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   // Use the default test mode from environment config
   const isTestMode = DEFAULT_TEST_MODE;
+  const currentPath = location.pathname;
 
   // Check if user has an active subscription
   useEffect(() => {
@@ -114,40 +120,12 @@ const SubscriptionPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ease-in-out relative`}>
-        <div className="flex items-center justify-center h-16 border-b border-gray-200">
-          <span className={`text-2xl font-bold text-indigo-600 transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-            Antara
-          </span>
-        </div>
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-20 bg-white border border-gray-200 rounded-full p-1 shadow-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <FaChevronLeft className={`h-4 w-4 text-gray-600 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
-        </button>
-        <nav className="mt-6 px-4 space-y-4">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaHome className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Dashboard
-            </span>
-          </button>
-          <button
-            onClick={() => navigate('/subscription')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaRocket className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Subscription
-            </span>
-          </button>
-
-        </nav>
-      </div>
+      <MainSidebar
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        currentPath={currentPath}
+        isAdmin={isAdmin}
+      />
 
       <div className="flex-1">
         {/* Top Navigation */}

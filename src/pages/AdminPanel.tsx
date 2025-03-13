@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaChevronLeft, FaHome, FaRocket, FaUser, FaCog, FaSignOutAlt, FaBell, FaShieldAlt, FaUsers, FaDatabase, FaChartLine, FaCogs } from 'react-icons/fa';
+import { useLocation, Link } from 'react-router-dom';
+import { FaUser, FaRightFromBracket, FaBell, FaShieldHalved, FaUsers, FaRocket, FaDatabase, FaChartLine, FaGear, FaClipboard } from 'react-icons/fa6';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import AdminSidebar from '../components/AdminSidebar';
 
 const AdminPanel: React.FC = () => {
-  const navigate = useNavigate();
+
+  const location = useLocation();
   const { user, signOut, plan } = useAuth();
   const { unreadCount, markAllAsRead } = useNotifications();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -20,51 +22,16 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const currentPath = location.pathname;
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ease-in-out relative`}>
-        <div className="flex items-center justify-center h-16 border-b border-gray-200">
-          <span className={`text-2xl font-bold text-indigo-600 transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-            Antara Admin
-          </span>
-        </div>
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-20 bg-white border border-gray-200 rounded-full p-1 shadow-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <FaChevronLeft className={`h-4 w-4 text-gray-600 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
-        </button>
-        <nav className="mt-6 px-4 space-y-4">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaHome className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Dashboard
-            </span>
-          </button>
-          <button
-            onClick={() => navigate('/admin')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaShieldAlt className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Admin Panel
-            </span>
-          </button>
-          <button
-            onClick={() => navigate('/subscription')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaRocket className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Subscription
-            </span>
-          </button>
-        </nav>
-      </div>
+      <AdminSidebar
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        currentPath={currentPath}
+      />
 
       <div className="flex-1">
         {/* Top Navigation */}
@@ -114,14 +81,14 @@ const AdminPanel: React.FC = () => {
                         onClick={() => {/* TODO: Implement settings */}}
                         className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
-                        <FaCog className="mr-3 h-4 w-4" />
+                        <FaGear className="mr-3 h-4 w-4" />
                         Settings
                       </button>
                       <button
                         onClick={handleSignOut}
                         className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
-                        <FaSignOutAlt className="mr-3 h-4 w-4" />
+                        <FaRightFromBracket className="mr-3 h-4 w-4" />
                         Sign out
                       </button>
                     </div>
@@ -142,7 +109,7 @@ const AdminPanel: React.FC = () => {
                 Active
               </span>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <FaShieldAlt className="mr-1 h-3 w-3" />
+                <FaShieldHalved className="mr-1 h-3 w-3" />
                 Admin
               </span>
             </div>
@@ -230,7 +197,7 @@ const AdminPanel: React.FC = () => {
               </p>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center mb-4">
                     <FaUsers className="h-5 w-5 text-indigo-600 mr-2" />
@@ -239,22 +206,44 @@ const AdminPanel: React.FC = () => {
                   <p className="text-gray-600 mb-4">
                     Manage user accounts, roles, and permissions. View user activity and subscription status.
                   </p>
-                  <button className="w-full bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                  <Link 
+                    to="/admin/users"
+                    className="w-full bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center"
+                  >
                     Manage Users
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center mb-4">
-                    <FaCogs className="h-5 w-5 text-indigo-600 mr-2" />
-                    <h4 className="text-lg font-medium text-gray-900">System Configuration</h4>
+                    <FaGear className="h-5 w-5 text-indigo-600 mr-2" />
+                    <h4 className="text-lg font-medium text-gray-900">Admin Settings</h4>
                   </div>
                   <p className="text-gray-600 mb-4">
                     Configure system settings, API integrations, and global preferences for all users.
                   </p>
-                  <button className="w-full bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                    System Settings
-                  </button>
+                  <Link 
+                    to="/admin/settings"
+                    className="w-full bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center"
+                  >
+                    Admin Settings
+                  </Link>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center mb-4">
+                    <FaClipboard className="h-5 w-5 text-indigo-600 mr-2" />
+                    <h4 className="text-lg font-medium text-gray-900">Admin Logs</h4>
+                  </div>
+                  <p className="text-gray-600 mb-4">
+                    View and export admin action logs. Track system changes and user modifications.
+                  </p>
+                  <Link 
+                    to="/admin/logs"
+                    className="w-full bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center"
+                  >
+                    View Logs
+                  </Link>
                 </div>
               </div>
             </div>

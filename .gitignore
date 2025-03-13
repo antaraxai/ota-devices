@@ -67,6 +67,16 @@ shared_repos/
 device_workspaces/
 old-device-api.py
 
+# Localization and internationalization files
+public/locales/
+src/components/LocalizationDemo.tsx
+src/components/LocalizationInfo.tsx
+src/components/LocalizationSettings.tsx
+src/contexts/LocalizationContext.tsx
+src/i18n.ts
+src/services/GeoLocationService.ts
+src/utils/dateUtils.ts
+
 # Modular version specific
 python/modular-version/*/shared_repos/
 python/modular-version/*/device_workspaces/

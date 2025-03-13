@@ -5,11 +5,16 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DeviceProvider } from './contexts/DeviceContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Auth from './pages/Auth';
+import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
 import SubscriptionPage from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import SubscriptionFailed from './pages/SubscriptionFailed';
 import Profile from './pages/Profile';
 import AdminPanel from './pages/AdminPanel';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
+import AdminLogsPage from './pages/AdminLogsPage';
 import AdminRoute from './components/AdminRoute';
 
 // Protected Route wrapper component
@@ -65,6 +70,27 @@ function App() {
                 <AdminRoute>
                   <AdminPanel />
                 </AdminRoute>
+              } />
+              <Route path="/admin/users" element={
+                <AdminRoute>
+                  <AdminUsersPage />
+                </AdminRoute>
+              } />
+              <Route path="/admin/settings" element={
+                <AdminRoute>
+                  <AdminSettingsPage />
+                </AdminRoute>
+              } />
+              <Route path="/admin/logs" element={
+                <AdminRoute>
+                  <AdminLogsPage />
+                </AdminRoute>
+              } />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/subscription/failed" element={
+                <ProtectedRoute>
+                  <SubscriptionFailed />
+                </ProtectedRoute>
               } />
             </Routes>
           </Router>

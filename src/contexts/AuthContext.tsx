@@ -85,8 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRoles(userRoles);
       console.log('Setting roles to:', userRoles);
       
-      // Check if user is admin
-      setIsAdmin(userRoles.includes('admin'));
+      // Check if user is admin (either has admin role or pro plan)
+      const hasAdminRole = userRoles.includes('admin');
+      const hasProPlan = userPlan === 'pro';
+      const adminStatus = hasAdminRole || hasProPlan;
+      console.log('User admin status:', adminStatus, 'based on roles:', userRoles, 'and plan:', userPlan);
+      setIsAdmin(adminStatus);
     } catch (error) {
       console.error('Error in refreshUserData:', error);
     }
@@ -120,8 +124,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoles(userRoles);
         console.log('Setting initial roles to:', userRoles);
         
-        // Check if user is admin
-        setIsAdmin(userRoles.includes('admin'));
+        // Check if user is admin (either has admin role or pro plan)
+        const hasAdminRole = userRoles.includes('admin');
+        const hasProPlan = userPlan === 'pro';
+        const initialAdminStatus = hasAdminRole || hasProPlan;
+        console.log('Initial admin status:', initialAdminStatus, 'based on roles:', userRoles, 'and plan:', userPlan);
+        setIsAdmin(initialAdminStatus);
       }
       setLoading(false);
     })
@@ -153,8 +161,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoles(userRoles);
         console.log('Setting roles to:', userRoles);
         
-        // Check if user is admin
-        setIsAdmin(userRoles.includes('admin'));
+        // Check if user is admin (either has admin role or pro plan)
+        const hasAdminRole = userRoles.includes('admin');
+        const hasProPlan = userPlan === 'pro';
+        const adminStatus = hasAdminRole || hasProPlan;
+        console.log('Auth state change - admin status:', adminStatus, 'based on roles:', userRoles, 'and plan:', userPlan);
+        setIsAdmin(adminStatus);
       } else {
         setPlan('free');
         setRoles(['user']);

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { FaUser, FaCog, FaBell, FaSignOutAlt, FaChartBar, FaHome, FaRocket, FaChevronLeft } from 'react-icons/fa';
+import { FaUser, FaBell } from 'react-icons/fa6';
 import { useNotifications } from '../contexts/NotificationContext';
+import MainSidebar from '../components/MainSidebar';
 
 interface SubscriptionDetails {
   plan_name: string;
@@ -13,19 +14,20 @@ interface SubscriptionDetails {
 }
 
 export default function Profile() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const { unreadCount, markAllAsRead } = useNotifications();
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const currentPath = '/profile';
 
   // Ensure the page has the dashboard layout
   document.title = "Profile - Dashboard";
 
   // Helper function to format dates consistently
-  const formatSubscriptionDate = (timestamp) => {
+  const formatSubscriptionDate = (timestamp: string | number) => {
     if (!timestamp) return 'N/A';
     
     try {
@@ -239,6 +241,7 @@ export default function Profile() {
     fetchSubscriptionDetails();
   }, [user]);
 
+  // Sign out function used in profile menu
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -260,48 +263,12 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ease-in-out relative`}>
-        <div className="flex items-center justify-center h-16 border-b border-gray-200">
-          <span className={`text-2xl font-bold text-indigo-600 transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-            Antara
-          </span>
-        </div>
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-20 bg-white border border-gray-200 rounded-full p-1 shadow-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <FaChevronLeft className={`h-4 w-4 text-gray-600 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
-        </button>
-        <nav className="mt-6 px-4 space-y-4">
-          <button
-            onClick={() => window.location.href = '/dashboard'}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaHome className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Dashboard
-            </span>
-          </button>
-          <button
-            onClick={() => window.location.href = '/subscription'}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-gray-700 hover:bg-gray-100 rounded-md ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaRocket className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Subscription
-            </span>
-          </button>
-          <button
-            onClick={() => window.location.href = '/profile'}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'px-2' : 'px-4'} py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isSidebarCollapsed ? 'justify-center' : ''}`}
-          >
-            <FaUser className="h-5 w-5" />
-            <span className={`ml-3 transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-              Profile
-            </span>
-          </button>
-        </nav>
-      </div>
+      <MainSidebar
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        currentPath={currentPath}
+        isAdmin={isAdmin}
+      />
 
       <div className="flex-1">
         {/* Top Navigation */}
@@ -334,6 +301,30 @@ export default function Profile() {
                       <FaUser className="h-4 w-4 text-white" />
                     </div>
                   </button>
+                  
+                  {/* Profile Dropdown Menu */}
+                  {isProfileMenuOpen && (
+                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                      <a
+                        href="/profile"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Your Profile
+                      </a>
+                      <a
+                        href="/settings"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Settings
+                      </a>
+                      <button
+                        onClick={handleSignOut}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -411,6 +402,8 @@ export default function Profile() {
                 </dl>
               </div>
             </div>
+            
+            {/* Localization section removed */}
           </div>
         </div>
       </div>
