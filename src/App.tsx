@@ -35,7 +35,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <DeviceProvider>
+      {/* <DeviceProvider> */}
         <NotificationProvider>
           <ToastContainer />
           <Router>
@@ -95,7 +95,7 @@ function App() {
             </Routes>
           </Router>
         </NotificationProvider>
-      </DeviceProvider>
+      {/* </DeviceProvider> */}
     </AuthProvider>
   );
 }
